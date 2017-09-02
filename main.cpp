@@ -30,17 +30,12 @@ void deallocate(int** in, int rows){
 }
 
 int weightedprob(int max){
-    if(max == 0) return 0;
-    int sum = (max * (max+1))/2; //Thanks, Gauss!
-    int r = rand() % sum;
-    for(int i = 1; i < maxtemp; i++){
-        if(r < max) return i;
-        r -= i;
-    }
+    int r = max - (rand() % 2);
+    return r < 0 ? 0 : r;
 }
 
 inline float dist(float x, float y){
-    return (sqrt((x*x) + (y*y)) / 90) + 0.1;
+    return (sqrt((x*x) + (y*y)) / 100) + 0.1;
 }
 
 void nextframe(int** field, int** count){
@@ -55,8 +50,8 @@ void nextframe(int** field, int** count){
                     int x = j + xoff;
                     if(x < 0)         avg += 0;
                     else if(x >= SCW) avg += 0;
-                    else if(y >= SCH)  avg += field[SCH][x];
-                    else avg += field[y][x];
+                    else if(y >= SCH)  avg += field[SCH][x] / dist(x, y);
+                    else avg += field[y][x] / dist(y, x);
                     counter++;
                 }
             }
