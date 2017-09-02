@@ -38,7 +38,7 @@ int main(int argc, char** argv){
     for(int i = 0; i < width; i++){
         world[i] = rand()%2;
     }
-    for(int i = 0; i > -1; i++){
+    for(int i = 0; i < 100; i++){
         printit(world);
         wolfram(world, rule);
     }

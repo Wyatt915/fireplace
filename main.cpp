@@ -1,11 +1,8 @@
 #include <cmath>
-#include <iostream>
 #include <ncurses.h>
 #include <stdlib.h>
 #include <ctime>
 #include <unistd.h>
-#include <vector>
-#include <string>
 
 int SCW, SCH, maxtemp, gen;
 
@@ -31,8 +28,10 @@ void deallocate(int** in, int rows){
 }
 
 int weightedprob(int max){
-    int r = max - (rand() % 2);
-    return r < 0 ? 0 : r;
+    if(max == 0) return 0;
+    int r = (rand() % max);
+    if(r == 0) max--;
+    return max;
 }
 
 float dist(float x, float y){
@@ -42,7 +41,7 @@ float dist(float x, float y){
 
 float hotplate_temp_at(int* hotplate, int x){
     float total = 0;
-    for(int i = -4; i <=4; i++){
+    for(int i = -9; i <= 9; i++){
         int j = x + i;
         if(j <0 || j >= SCW){
             total +=0;
@@ -51,7 +50,8 @@ float hotplate_temp_at(int* hotplate, int x){
             total += hotplate[j];
         }
     }
-    return (total * maxtemp) / 9.0;
+    total = (total * maxtemp) / 9.0;
+    return total > maxtemp ? maxtemp : total;
 }
 
 void nextframe(int** field, int** count, int* hotplate){
@@ -60,8 +60,8 @@ void nextframe(int** field, int** count, int* hotplate){
             float avg = 0;
             //int temp = rand() % maxtemp * 4;
             int counter = 0;
-            for(int xoff = -7; xoff <= 7; xoff++){
-                for(int yoff = 1; yoff < 7; yoff++){
+            for(int xoff = -5; xoff <= 5; xoff++){
+                for(int yoff = 1; yoff <= 5; yoff++){
                     int y = i + yoff;
                     y = y < 0 ? 0 : y;
                     int x = j + xoff;
@@ -108,11 +108,11 @@ int time_in_ms(){
 
 //clamps the framerate, returns true only every n milliseconds
 bool advance(int n){
-#ifndef STEP
-    return (time_in_ms() % n) <= 10;
-#else
-    return true;
-#endif
+    #ifndef STEP
+        return (time_in_ms() % n) <= 1;
+    #else
+        return true;
+    #endif
 }
 
 void flames(){
@@ -139,8 +139,7 @@ void flames(){
                 }
             }
             nextframe(field, count, hotplate);
-            wolfram(hotplate, 90);
-            mvaddstr(0,0, std::to_string(gen).c_str());
+            wolfram(hotplate, 150);
             refresh();
         }
     }
@@ -151,27 +150,26 @@ void flames(){
 
 void set_colors(){
     start_color();
-    //init_color(COLOR_BLACK,    0,     0,     0);
-    init_color(COLOR_RED,      100,   0,     0);
-    init_color(COLOR_GREEN,    300,   0,     0);
-    init_color(COLOR_BLUE,     500,   100,   0);
-    init_color(COLOR_YELLOW,   700,   300,   0);
-    init_color(COLOR_MAGENTA,  900,   500,   100);
+    init_color(COLOR_RED,      300,   0,     0);
+    init_color(COLOR_GREEN,    500,   0,     0);
+    init_color(COLOR_BLUE,     700,   100,   0);
+    init_color(COLOR_YELLOW,   900,   300,   0);
+    init_color(COLOR_MAGENTA,  1000,  500,   100);
     init_color(COLOR_CYAN,     1000,  800,   500);
     init_color(COLOR_WHITE,    1000,  1000,  1000);
-
-    init_pair(1, COLOR_RED, COLOR_BLACK);
-    init_pair(2, COLOR_GREEN, COLOR_BLACK);
-    init_pair(3, COLOR_BLUE, COLOR_BLACK);
-    init_pair(4, COLOR_YELLOW, COLOR_BLACK);
-    init_pair(5, COLOR_MAGENTA, COLOR_BLACK);
-    init_pair(6, COLOR_CYAN, COLOR_BLACK);
-    init_pair(7, COLOR_WHITE, COLOR_BLACK);
+    
+    init_pair(1,  COLOR_RED,      COLOR_BLACK);
+    init_pair(2,  COLOR_GREEN,    COLOR_BLACK);
+    init_pair(3,  COLOR_BLUE,     COLOR_BLACK);
+    init_pair(4,  COLOR_YELLOW,   COLOR_BLACK);
+    init_pair(5,  COLOR_MAGENTA,  COLOR_BLACK);
+    init_pair(6,  COLOR_CYAN,     COLOR_BLACK);
+    init_pair(7,  COLOR_WHITE,    COLOR_BLACK);
 }
 
 int main(int argc, char** argv){
     gen = 0;
-    maxtemp = 16;
+    maxtemp = 10;
     srand(time(NULL));
     initscr();
     curs_set(0);
