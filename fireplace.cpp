@@ -38,6 +38,7 @@ void deallocate(int** in, int rows){
 void start_ncurses(){
     initscr();
     start_color();
+    init_color(COLOR_BLACK,    100,   100,   100);
     init_color(COLOR_RED,      300,   0,     0);
     init_color(COLOR_GREEN,    500,   0,     0);
     init_color(COLOR_BLUE,     700,   100,   0);
