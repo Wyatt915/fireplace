@@ -10,6 +10,7 @@ int WIDTH, HEIGHT;  //Set by ncurses
 int maxtemp;        //maximum flame temperature
 int framerate;      //framerate
 char dispch;        //the character used to draw the flames
+int heightrecord;   //max height reached by the flames
 
 //------------------------------[Memory Management and Initialization]------------------------------
 
@@ -58,6 +59,7 @@ void start_ncurses(){
     noecho();
     keypad(stdscr, TRUE); 
     getmaxyx(stdscr, HEIGHT, WIDTH);
+    heightrecord = HEIGHT;
 }
 
 //---------------------------------------[Cellular Automata]---------------------------------------
@@ -74,7 +76,7 @@ float hotplate_temp_at(int* hotplate, int x){
     float total = 0;
     for(int i = -9; i <= 9; i++){
         int j = x + i;
-        if(j <0 || j >= WIDTH){
+        if(j < 0 || j >= WIDTH){
             total +=0;
         }
         else{
@@ -85,9 +87,21 @@ float hotplate_temp_at(int* hotplate, int x){
     return total > maxtemp ? maxtemp : total;
 }
 
+void cleargrid(int** grid){
+    for(int i = 0; i < HEIGHT; i++){
+        for(int j = 0; j < WIDTH; j++){
+            grid[i][j] = 0;
+        }
+    }
+}
 
 void nextframe(int** field, int** count, int* hotplate){
-    for(int i = 1; i <= HEIGHT; i++){
+    cleargrid(count);
+    int rowsum = 0;
+    int h = heightrecord - 3;
+    h = h < 1 ? 1 : h;  //we can ignore the vast majority of cold cells
+                        //and skip down to the bottom of the window
+    for(int i = h; i <= HEIGHT; i++){
         for(int j = 0; j < WIDTH; j++){
             float avg = 0;
             //int temp = rand() % maxtemp * 4;
@@ -117,7 +131,10 @@ void nextframe(int** field, int** count, int* hotplate){
             //see if the cell cools or not
             //we add the value at (i-1) so that an upward motion will be created.
             count[i - 1][j] = cooldown(avg);
+            rowsum += count[i-1][j];
         }
+        if(rowsum > 0 && i < heightrecord) heightrecord = i;
+        rowsum = 0;
     }
     
     for(int i = 0; i < HEIGHT; i++){
@@ -196,13 +213,15 @@ void flames(){
 }
 
 void printhelp(char progname[]){
-    std::cout << "Usage: " << progname << " [options]\n"
-        << "\t-c character\tAn ASCII character to draw the flames. Default is '@'\n"
+    std::cout << "\nUsage: " << progname << " [options]\n"
+        << "\t-c character\tAn ASCII character to draw the flames. Default is '@'.\n"
         << "\t-h\t\tPrint this message.\n"
         << "\t-f framerate\tSet the framerate in frames/sec. Default is 20.\n"
-        << "\t-t temp\t\tSet the maximum temperature of the flames. Default is 10. A higher temp means taller flames.\n"
+        << "\t\t\tA framerate of zero will make frames spit out as soon as they are ready.\n"
+        << "\t-t temp\t\tSet the maximum temperature of the flames. Default is 10.\n"
+        << "\t\t\tA higher temp means taller flames.\n"
         << "\n"
-        << "Press q at any time to douse the flames.";
+        << "Press q at any time to douse the flames.\n\n";
 }
 
 int main(int argc, char** argv){
@@ -222,13 +241,14 @@ int main(int argc, char** argv){
                 printhelp(argv[0]);
                 return 1;
             case 'f':
-                framerate = 1000 / atoi(optarg);
+                if(atoi(optarg) < 1) framerate = 0;
+                else framerate = 1000 / atoi(optarg);
                 break;
             case 't':
                 maxtemp = atoi(optarg);
                 break;
             case '?':
-                std::cout << "You've really bunged this one up. Here, this may help:\n\n";
+                std::cout << "\nYou've really bunged this one up. Here, this may help:\n";
                 printhelp(argv[0]);
                 return 1;
             default:
