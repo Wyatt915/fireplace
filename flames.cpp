@@ -1,10 +1,10 @@
-#include <cmath>
+#include <ctime>
 #include <ncurses.h>
 #include <stdlib.h>
-#include <ctime>
 #include <unistd.h>
+#include <iostream>
 
-int SCW, SCH, maxtemp, gen;
+int SCW, SCH, maxtemp, gen, framerate;
 
 int** init(int y, int x){
     int** out = new int*[y];
@@ -34,11 +34,6 @@ int weightedprob(int max){
     return max;
 }
 
-float dist(float x, float y){
-    float d = sqrt((x*x) + (y*y));
-    return d  == 0 ? 0.5 : d;
-}
-
 float hotplate_temp_at(int* hotplate, int x){
     float total = 0;
     for(int i = -9; i <= 9; i++){
@@ -60,8 +55,8 @@ void nextframe(int** field, int** count, int* hotplate){
             float avg = 0;
             //int temp = rand() % maxtemp * 4;
             int counter = 0;
-            for(int xoff = -5; xoff <= 5; xoff++){
-                for(int yoff = 1; yoff <= 5; yoff++){
+            for(int xoff = -3; xoff <= 3; xoff++){
+                for(int yoff = -1; yoff <= 3; yoff++){
                     int y = i + yoff;
                     y = y < 0 ? 0 : y;
                     int x = j + xoff;
@@ -89,9 +84,9 @@ void wolfram(int* world, const int rule){
     int* next = new int[SCW];
     int current;
     for(int i = 0; i < SCW; i++){
-        l = i-1 < 0 ? 0 : world[i-1];
+        l = world[(i-1)%SCW];
         c = world[i];
-        r = i+1 >= SCW ? 0 : world[i+1];
+        r = world[(i+1)%SCW];
         current = (l<<2) | (c<<1) | r;
         next[i] = ((1<<current) & rule) > 0 ? 1 : 0;
     }
@@ -102,17 +97,25 @@ void wolfram(int* world, const int rule){
     delete[] next;
 }
 
-int time_in_ms(){
-    return std::clock() / (double)(CLOCKS_PER_SEC / 1000);
+void animate(int** field, int** count, int* hotplate){
+    char disp;
+    for(int i = 0; i < SCH; i++){
+        for(int j = 0; j < SCW; j++){
+            move(i,j);
+            disp = field[i][j] == 0 ? ' ' : '@';
+            int color = (7 * field[i][j] / maxtemp) + 1;
+            attron(COLOR_PAIR(color));
+            addch(disp);
+            attroff(COLOR_PAIR(color));
+        }
+    }
+    nextframe(field, count, hotplate);
+    wolfram(hotplate, 60);
+    refresh();
 }
 
-//clamps the framerate, returns true only every n milliseconds
-bool advance(int n){
-    #ifndef STEP
-        return (time_in_ms() % n) <= 1;
-    #else
-        return true;
-    #endif
+unsigned long int time_in_ms(){
+    return std::clock() / (double)(CLOCKS_PER_SEC / 1000);
 }
 
 void flames(){
@@ -124,26 +127,19 @@ void flames(){
         hotplate[i] = rand() % 2;
     }
     
-    char c, disp;
+    char c = 0;
+    
+    unsigned long int prevframe = time_in_ms();
+
     while((c = getch()) != 'q'){
-        if(advance(100)){
-            gen++;
-            for(int i = 0; i < SCH; i++){
-                for(int j = 0; j < SCW; j++){
-                    move(i,j);
-                    disp = field[i][j] == 0 ? ' ' : '@';
-                    int color = (7 * field[i][j] / maxtemp) + 1;
-                    attron(COLOR_PAIR(color));
-                    addch(disp);
-                    attroff(COLOR_PAIR(color));
-                }
-            }
-            nextframe(field, count, hotplate);
-            wolfram(hotplate, 150);
-            refresh();
+        if(time_in_ms() >= prevframe + framerate){
+            animate(field, count, hotplate);
+            prevframe = time_in_ms();
         }
     }
+
     refresh();
+    delete[] hotplate;
     deallocate(field, SCH);
     deallocate(count, SCH);
 }
@@ -173,14 +169,13 @@ int main(int argc, char** argv){
     srand(time(NULL));
     initscr();
     curs_set(0);
-    cbreak();
-    #ifndef STEP
     timeout(0);
-    #endif
+    cbreak();
     noecho();
     keypad(stdscr, TRUE); 
     getmaxyx(stdscr, SCH, SCW);
     set_colors();
+    framerate = 1000 / 20;
     flames();
     endwin();
     return 0;
