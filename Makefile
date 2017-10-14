@@ -1,2 +1,2 @@
 all:
-	g++ -std=c++14 -g -lncurses flames.cpp -o flames
+	g++ -std=c++14 -lncurses fireplace.cpp -o fireplace
