@@ -8,7 +8,7 @@ A cozy fireplace in your terminal
 * `make`
 * `./fireplace`
 
-###Options
+### Options
 ```
 Usage: ./fireplace [options]
 	-c character	An ASCII character to draw the flames. Default is '@'.
