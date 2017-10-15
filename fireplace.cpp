@@ -145,17 +145,18 @@ void nextframe(int** field, int** count, int* hotplate){
     }
 }
 
+//Wolfram's Elementary cellular atomaton
 void wolfram(int* world, const int rule){
     int l,c,r;
+    int lidx, ridx;
     int* next = new int[WIDTH];
     int current;
     for(int i = 0; i < WIDTH; i++){
-        if (i > 0)
-            l = world[(i-1)%WIDTH];
-        else
-            l = 0;
+        lidx = i > 0 ? i - 1 : WIDTH - 1;
+        ridx = (i + 1) % WIDTH;
+        l = world[lidx];
         c = world[i];
-        r = world[(i+1)%WIDTH];
+        r = world[ridx];
         current = (l<<2) | (c<<1) | r;
         next[i] = ((1<<current) & rule) > 0 ? 1 : 0;
     }
