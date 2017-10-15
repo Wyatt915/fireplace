@@ -54,8 +54,8 @@ void start_ncurses(){
     init_pair(5,  COLOR_MAGENTA,  COLOR_BLACK);
     init_pair(6,  COLOR_CYAN,     COLOR_BLACK);
     init_pair(7,  COLOR_WHITE,    COLOR_BLACK);
-    curs_set(0);
-    timeout(0);
+    curs_set(0);    //invisible cursor
+    timeout(0);     //make getch() non-blocking
     cbreak();
     noecho();
     keypad(stdscr, TRUE); 
@@ -181,15 +181,12 @@ void animate(int** field, int** count, int* hotplate){
         }
     }
     nextframe(field, count, hotplate);
+    //Use Rule 60 (http://mathworld.wolfram.com/Rule60.html) to make flames dynamic
     wolfram(hotplate, 60);
     refresh();
 }
 
 //-------------------------------------------[Main Loop]-------------------------------------------
-
-unsigned long int time_in_ms(){
-    return std::clock() / (double)(CLOCKS_PER_SEC / 1000);
-}
 
 void flames(){
     int** field = init(HEIGHT, WIDTH); //The cells that will be displayed
@@ -202,13 +199,9 @@ void flames(){
     
     char c = 0;
     
-    unsigned long int prevframe = time_in_ms();
-
     while((c = getch()) != 'q'){
-        if(time_in_ms() >= prevframe + framerate){
-            animate(field, count, hotplate);
-            prevframe = time_in_ms();
-        }
+        animate(field, count, hotplate);
+        usleep(framerate);
     }
 
     refresh();
@@ -231,7 +224,7 @@ void printhelp(char progname[]){
 
 int main(int argc, char** argv){
     srand(time(NULL));
-    framerate = 1000 / 20;
+    framerate = 1000000 / 20;
     maxtemp = 10;
     dispch = '@';
     
@@ -247,7 +240,7 @@ int main(int argc, char** argv){
                 return 1;
             case 'f':
                 if(atoi(optarg) < 1) framerate = 0;
-                else framerate = 1000 / atoi(optarg);
+                else framerate = 1000000 / atoi(optarg);
                 break;
             case 't':
                 maxtemp = atoi(optarg);
