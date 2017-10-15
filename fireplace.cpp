@@ -88,8 +88,8 @@ float hotplate_temp_at(int* hotplate, int x){
     return total > maxtemp ? maxtemp : total;
 }
 
-void cleargrid(int** grid){
-    for(int i = 0; i < HEIGHT; i++){
+void cleargrid(int** grid, int h){
+    for(int i = h; i < HEIGHT; i++){
         for(int j = 0; j < WIDTH; j++){
             grid[i][j] = 0;
         }
@@ -97,7 +97,7 @@ void cleargrid(int** grid){
 }
 
 void nextframe(int** field, int** count, int* hotplate){
-    cleargrid(count);
+    cleargrid(count, heightrecord);
     int rowsum = 0;
     int h = heightrecord - 3;
     h = h < 1 ? 1 : h;  //we can ignore the vast majority of cold cells
@@ -146,10 +146,9 @@ void nextframe(int** field, int** count, int* hotplate){
 }
 
 //Wolfram's Elementary cellular atomaton
-void wolfram(int* world, const int rule){
+void wolfram(int* world, int* next, const int rule){
     int l,c,r;
     int lidx, ridx;
-    int* next = new int[WIDTH];
     int current;
     for(int i = 0; i < WIDTH; i++){
         lidx = i > 0 ? i - 1 : WIDTH - 1;
@@ -164,7 +163,6 @@ void wolfram(int* world, const int rule){
     for(int i = 0; i < WIDTH; i++){
         world[i] = next[i];
     }
-    delete[] next;
 }
 
 void animate(int** field, int** count, int* hotplate){
@@ -182,7 +180,6 @@ void animate(int** field, int** count, int* hotplate){
     }
     nextframe(field, count, hotplate);
     //Use Rule 60 (http://mathworld.wolfram.com/Rule60.html) to make flames dynamic
-    wolfram(hotplate, 60);
     refresh();
 }
 
@@ -192,6 +189,7 @@ void flames(){
     int** field = init(HEIGHT, WIDTH); //The cells that will be displayed
     int** count = init(HEIGHT, WIDTH); //A grid of cells used to tally neighbors for CA purposes
     int* hotplate = new int[WIDTH]; //these special cells provide "heat" at the bottom of the screen.
+    int* hotplate_count = new int[WIDTH];
     
     for(int i = 0; i < WIDTH; i++){
         hotplate[i] = rand() % 2;
@@ -201,11 +199,13 @@ void flames(){
     
     while((c = getch()) != 'q'){
         animate(field, count, hotplate);
+        wolfram(hotplate, hotplate_count, 60);
         usleep(framerate);
     }
 
     refresh();
     delete[] hotplate;
+    delete[] hotplate_count;
     deallocate(field, HEIGHT);
     deallocate(count, HEIGHT);
 }
