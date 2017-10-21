@@ -1,19 +1,23 @@
 #include <ctime>
+#include <iostream>
 #include <ncurses.h>
+#include <signal.h>
 #include <stdlib.h> //random
 #include <unistd.h> //getopt
-#include <iostream>
 
 #define MIN(X, Y)  ((X) < (Y) ? (X) : (Y))
 #define MAX(X, Y)  ((X) > (Y) ? (X) : (Y))
 
 //----------------------------------------[Global variables]----------------------------------------
 
-int WIDTH, HEIGHT;  //Set by ncurses
-int maxtemp;        //maximum flame temperature
-int framerate;      //framerate
-char dispch;        //the character used to draw the flames
-int heightrecord;   //max height reached by the flames
+static char dispch;        //the character used to draw the flames
+static int WIDTH, HEIGHT;  //Set by ncurses
+static int framerate;      //framerate
+static int heightrecord;   //max height reached by the flames
+static int maxtemp;        //maximum flame temperature
+static int wolfrule;       //rule for wolfram eca
+
+static volatile sig_atomic_t sig_caught = 0;
 
 //------------------------------[Memory Management and Initialization]------------------------------
 
@@ -69,11 +73,11 @@ void start_ncurses(){
 //---------------------------------------[Cellular Automata]---------------------------------------
 
 //As a cell cools it has a higher chance of cooling again on the next frame.
-int cooldown(int max){
-    if(max == 0) return 0;
-    int r = (rand() % max);
-    if(r == 0) max--;
-    return max;
+int cooldown(int heat){
+    if(heat == 0) return 0;
+    int r = (rand() % heat);
+    if(r == 0) heat--;
+    return heat;
 }
 
 void cleargrid(int** grid, int h){
@@ -133,7 +137,7 @@ void nextframe(int** field, int** count, int* hotplate){
     }
 }
 
-void animate(int** field, int** count, int* hotplate){
+void printframe(int** field, int** count, int* hotplate){
     char disp;
     for(int i = 0; i < HEIGHT; i++){
         for(int j = 0; j < WIDTH; j++){
@@ -147,7 +151,7 @@ void animate(int** field, int** count, int* hotplate){
             attroff(COLOR_PAIR(color));
         }
     }
-    nextframe(field, count, hotplate);
+    //mvaddstr(0, 0, std::to_string(wolfrule).c_str());
     refresh();
 }
 
@@ -195,12 +199,13 @@ void flames(){
     
     char c = 0;
     
-    while((c = getch()) != 'q'){
-        //Use Rule 60 (http://mathworld.wolfram.com/Rule60.html) to make flames dynamic
-        wolfram(heater, heater_count, 60);
+    while(sig_caught == 0){
+        //Use Rule 60 (http://mathworld.wolfram.com/Rule60.html) to make flames flicker nicely.
+        wolfram(heater, heater_count, wolfrule);
         warm(heater, hotplate);
-        animate(field, count, hotplate);
-        napms(framerate);
+        printframe(field, count, hotplate);
+        nextframe(field, count, hotplate);
+        usleep(framerate);
     }
 
     refresh();
@@ -220,18 +225,28 @@ void printhelp(char progname[]){
         << "\t-t temp\t\tSet the maximum temperature of the flames. Default is 10.\n"
         << "\t\t\tA higher temp means taller flames.\n"
         << "\n"
-        << "Press q at any time to douse the flames.\n\n";
+        << "Press ^C at any time to douse the flames.\n\n";
+}
+
+void signal_handler(int signum){
+    if(signum == SIGINT){
+        sig_caught = 1;
+    }
 }
 
 int main(int argc, char** argv){
+    signal(SIGINT, signal_handler);
+    
+    int persecond = 1000000;
     srand(time(NULL));
-    framerate = 1000 / 20;
+    framerate = persecond / 20;
     maxtemp = 10;
     dispch = '@';
+    wolfrule = 60;
     
     int c;
     opterr = 0;
-    while((c = getopt(argc, argv, "c:hf:t:")) != -1){
+    while((c = getopt(argc, argv, "c:hf:t:w:")) != -1){
         switch (c){
             case 'c':
                 dispch = optarg[0];
@@ -241,10 +256,13 @@ int main(int argc, char** argv){
                 return 0;
             case 'f':
                 if(atoi(optarg) < 1) framerate = 0;
-                else framerate = 1000 / atoi(optarg);
+                else framerate = persecond / atoi(optarg);
                 break;
             case 't':
                 maxtemp = atoi(optarg);
+                break;
+            case 'w':
+                wolfrule = atoi(optarg);
                 break;
             case '?':
                 std::cout << "\nYou've really bunged this one up. Here, this may help:\n";
@@ -258,6 +276,7 @@ int main(int argc, char** argv){
     
     start_ncurses();
     flames();
+    use_default_colors();
     endwin();
     return 0;
 }
