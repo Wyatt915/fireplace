@@ -3,7 +3,7 @@
 #include <ncurses.h>
 #include <signal.h>
 #include <stdlib.h> //random
-#include <unistd.h> //getopt
+#include <unistd.h> //usleep, getopt
 
 #define MIN(X, Y)  ((X) < (Y) ? (X) : (Y))
 #define MAX(X, Y)  ((X) > (Y) ? (X) : (Y))
@@ -18,6 +18,10 @@ static int maxtemp;        //maximum flame temperature
 static int wolfrule;       //rule for wolfram eca
 
 static volatile sig_atomic_t sig_caught = 0;
+
+//--------------------------------------------[Structs]--------------------------------------------
+
+struct color_val{ short r,g,b; };
 
 //------------------------------[Memory Management and Initialization]------------------------------
 
@@ -42,9 +46,14 @@ void deallocate(int** in, int rows){
     delete[] in;
 }
 
-void start_ncurses(){
+void start_ncurses(color_val* colors){
     initscr();
     start_color();
+    
+    for(int i = 0; i < 8; i++){
+        color_content(i, &colors[i].r, &colors[i].g, &colors[i].b);
+    }
+    
     init_color(COLOR_BLACK,    100,   100,   100);
     init_color(COLOR_RED,      300,   0,     0);
     init_color(COLOR_GREEN,    500,   0,     0);
@@ -70,7 +79,13 @@ void start_ncurses(){
     heightrecord = HEIGHT;
 }
 
-//---------------------------------------[Cellular Automata]---------------------------------------
+void restore_colors(color_val* colors){
+    for(int i = 0; i < 8; i++){
+        init_color(i, colors[i].r, colors[i].g, colors[i].b);
+    }
+}
+
+//-----------------------------------[Cellular Automata Helpers]-----------------------------------
 
 //As a cell cools it has a higher chance of cooling again on the next frame.
 int cooldown(int heat){
@@ -87,6 +102,17 @@ void cleargrid(int** grid, int h){
         }
     }
 }
+
+void warm(int* heater, int* hotplate){
+    for(int i = 0; i < WIDTH; i++){
+        hotplate[i] /= 2;
+    }
+    for(int i = 0; i < WIDTH; i++){
+        hotplate[i] += heater[i] * maxtemp;
+    }
+}
+
+//---------------------------------------[Cellular Automata]---------------------------------------
 
 void nextframe(int** field, int** count, int* hotplate){
     cleargrid(count, heightrecord);
@@ -137,24 +163,6 @@ void nextframe(int** field, int** count, int* hotplate){
     }
 }
 
-void printframe(int** field, int** count, int* hotplate){
-    char disp;
-    for(int i = 0; i < HEIGHT; i++){
-        for(int j = 0; j < WIDTH; j++){
-            move(i,j);
-            //if the cell is cold, print a space, otherwise print [dispch]
-            int color = (7 * field[i][j] / maxtemp) + 1;
-            color = MIN(color,7);
-            disp = field[i][j] == 0 ? ' ' : dispch;
-            attron(COLOR_PAIR(color));
-            addch(disp);
-            attroff(COLOR_PAIR(color));
-        }
-    }
-    //mvaddstr(0, 0, std::to_string(wolfrule).c_str());
-    refresh();
-}
-
 //Wolfram's Elementary cellular atomaton
 void wolfram(int* world, int* next, const int rule){
     int l,c,r;
@@ -175,16 +183,25 @@ void wolfram(int* world, int* next, const int rule){
     }
 }
 
-void warm(int* heater, int* hotplate){
-    for(int i = 0; i < WIDTH; i++){
-        hotplate[i] /= 2;
-    }
-    for(int i = 0; i < WIDTH; i++){
-        hotplate[i] += heater[i] * maxtemp;
-    }
-}
+//----------------------------------------[Draw and Animate]----------------------------------------
 
-//-------------------------------------------[Main Loop]-------------------------------------------
+void printframe(int** field, int** count, int* hotplate){
+    char disp;
+    for(int i = 0; i < HEIGHT; i++){
+        for(int j = 0; j < WIDTH; j++){
+            move(i,j);
+            //if the cell is cold, print a space, otherwise print [dispch]
+            int color = (7 * field[i][j] / maxtemp) + 1;
+            color = MIN(color,7);
+            disp = field[i][j] == 0 ? ' ' : dispch;
+            attron(COLOR_PAIR(color));
+            addch(disp);
+            attroff(COLOR_PAIR(color));
+        }
+    }
+    //mvaddstr(0, 0, std::to_string(wolfrule).c_str());
+    refresh();
+}
 
 void flames(){
     int** field = init(HEIGHT, WIDTH); //The cells that will be displayed
@@ -216,6 +233,8 @@ void flames(){
     deallocate(count, HEIGHT);
 }
 
+//---------------------------------------------[Misc.]---------------------------------------------
+
 void printhelp(char progname[]){
     std::cout << "\nUsage: " << progname << " [options]\n"
         << "\t-c character\tAn ASCII character to draw the flames. Default is '@'.\n"
@@ -233,6 +252,8 @@ void signal_handler(int signum){
         sig_caught = 1;
     }
 }
+
+//----------------------------------------------[Main]----------------------------------------------
 
 int main(int argc, char** argv){
     signal(SIGINT, signal_handler);
@@ -253,6 +274,7 @@ int main(int argc, char** argv){
                 break;
             case 'h':
                 printhelp(argv[0]);
+                std::cout << COLORS <<std::endl;
                 return 0;
             case 'f':
                 if(atoi(optarg) < 1) framerate = 0;
@@ -273,10 +295,11 @@ int main(int argc, char** argv){
                 return 2;
         }
     }
-    
-    start_ncurses();
+    color_val* colors = new color_val[8];
+    start_ncurses(colors);
     flames();
-    use_default_colors();
+    restore_colors(colors);
+    delete[] colors;
     endwin();
     return 0;
 }
