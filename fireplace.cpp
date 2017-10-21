@@ -4,6 +4,9 @@
 #include <unistd.h> //getopt
 #include <iostream>
 
+#define MIN(X, Y)  ((X) < (Y) ? (X) : (Y))
+#define MAX(X, Y)  ((X) > (Y) ? (X) : (Y))
+
 //----------------------------------------[Global variables]----------------------------------------
 
 int WIDTH, HEIGHT;  //Set by ncurses
@@ -73,23 +76,8 @@ int cooldown(int max){
     return max;
 }
 
-float hotplate_temp_at(int* hotplate, int x){
-    float total = 0;
-    for(int i = -9; i <= 9; i++){
-        int j = x + i;
-        if(j < 0 || j >= WIDTH){
-            total +=0;
-        }
-        else{
-            total += hotplate[j];
-        }
-    }
-    total = (total * maxtemp) / 9.0;
-    return total > maxtemp ? maxtemp : total;
-}
-
-void cleargrid(int** grid){
-    for(int i = 0; i < HEIGHT; i++){
+void cleargrid(int** grid, int h){
+    for(int i = h; i < HEIGHT; i++){
         for(int j = 0; j < WIDTH; j++){
             grid[i][j] = 0;
         }
@@ -97,11 +85,11 @@ void cleargrid(int** grid){
 }
 
 void nextframe(int** field, int** count, int* hotplate){
-    cleargrid(count);
+    cleargrid(count, heightrecord);
     int rowsum = 0;
     int h = heightrecord - 3;
-    h = h < 1 ? 1 : h;  //we can ignore the vast majority of cold cells
-                        //and skip down to the bottom of the window
+    h = MAX(h, 1);  //we can ignore the vast majority of cold cells
+                    //and skip down to the bottom of the window
     for(int i = h; i <= HEIGHT; i++){
         for(int j = 0; j < WIDTH; j++){
             float avg = 0;
@@ -117,13 +105,13 @@ void nextframe(int** field, int** count, int* hotplate){
             for(int xoff = -3; xoff <= 3; xoff++){
                 for(int yoff = -1; yoff <= 3; yoff++){
                     int y = i + yoff;
-                    y = y < 0 ? 0 : y; //if y is less than zero, clamp it to zero.
+                    y = MAX(y,0); //if y is less than zero, clamp it to zero.
                     int x = j + xoff;
                     //if the search has gon beyond the left or right, no heat is added
                     if(x < 0 || x >= WIDTH) avg += 0;
                     //if the search goes below the screen, add the hotplate value.
                     //the hotplate has infinite depth.
-                    else if(y >= HEIGHT)  avg += hotplate_temp_at(hotplate,x);
+                    else if(y >= HEIGHT)  avg += hotplate[x];
                     else avg += field[y][x];
                     counter++;
                 }
@@ -145,11 +133,28 @@ void nextframe(int** field, int** count, int* hotplate){
     }
 }
 
+void animate(int** field, int** count, int* hotplate){
+    char disp;
+    for(int i = 0; i < HEIGHT; i++){
+        for(int j = 0; j < WIDTH; j++){
+            move(i,j);
+            //if the cell is cold, print a space, otherwise print [dispch]
+            int color = (7 * field[i][j] / maxtemp) + 1;
+            color = MIN(color,7);
+            disp = field[i][j] == 0 ? ' ' : dispch;
+            attron(COLOR_PAIR(color));
+            addch(disp);
+            attroff(COLOR_PAIR(color));
+        }
+    }
+    nextframe(field, count, hotplate);
+    refresh();
+}
+
 //Wolfram's Elementary cellular atomaton
-void wolfram(int* world, const int rule){
+void wolfram(int* world, int* next, const int rule){
     int l,c,r;
     int lidx, ridx;
-    int* next = new int[WIDTH];
     int current;
     for(int i = 0; i < WIDTH; i++){
         lidx = i > 0 ? i - 1 : WIDTH - 1;
@@ -164,26 +169,15 @@ void wolfram(int* world, const int rule){
     for(int i = 0; i < WIDTH; i++){
         world[i] = next[i];
     }
-    delete[] next;
 }
 
-void animate(int** field, int** count, int* hotplate){
-    char disp;
-    for(int i = 0; i < HEIGHT; i++){
-        for(int j = 0; j < WIDTH; j++){
-            move(i,j);
-            //if the cell is cold, print a space, otherwise print [dispch]
-            disp = field[i][j] == 0 ? ' ' : dispch;
-            int color = (7 * field[i][j] / maxtemp) + 1;
-            attron(COLOR_PAIR(color));
-            addch(disp);
-            attroff(COLOR_PAIR(color));
-        }
+void warm(int* heater, int* hotplate){
+    for(int i = 0; i < WIDTH; i++){
+        hotplate[i] /= 2;
     }
-    nextframe(field, count, hotplate);
-    //Use Rule 60 (http://mathworld.wolfram.com/Rule60.html) to make flames dynamic
-    wolfram(hotplate, 60);
-    refresh();
+    for(int i = 0; i < WIDTH; i++){
+        hotplate[i] += heater[i] * maxtemp;
+    }
 }
 
 //-------------------------------------------[Main Loop]-------------------------------------------
@@ -191,21 +185,28 @@ void animate(int** field, int** count, int* hotplate){
 void flames(){
     int** field = init(HEIGHT, WIDTH); //The cells that will be displayed
     int** count = init(HEIGHT, WIDTH); //A grid of cells used to tally neighbors for CA purposes
-    int* hotplate = new int[WIDTH]; //these special cells provide "heat" at the bottom of the screen.
+    int* heater = new int[WIDTH]; //these special cells provide "heat" at the bottom of the screen.
+    int* heater_count = new int[WIDTH];
+    int* hotplate = new int[WIDTH]; //The heater heats the hotplate. The hotplate will cool without heat.
     
     for(int i = 0; i < WIDTH; i++){
-        hotplate[i] = rand() % 2;
+        heater[i] = rand() % 2;
     }
     
     char c = 0;
     
     while((c = getch()) != 'q'){
+        //Use Rule 60 (http://mathworld.wolfram.com/Rule60.html) to make flames dynamic
+        wolfram(heater, heater_count, 60);
+        warm(heater, hotplate);
         animate(field, count, hotplate);
-        usleep(framerate);
+        napms(framerate);
     }
 
     refresh();
     delete[] hotplate;
+    delete[] heater;
+    delete[] heater_count;
     deallocate(field, HEIGHT);
     deallocate(count, HEIGHT);
 }
@@ -224,7 +225,7 @@ void printhelp(char progname[]){
 
 int main(int argc, char** argv){
     srand(time(NULL));
-    framerate = 1000000 / 20;
+    framerate = 1000 / 20;
     maxtemp = 10;
     dispch = '@';
     
@@ -237,10 +238,10 @@ int main(int argc, char** argv){
                 break;
             case 'h':
                 printhelp(argv[0]);
-                return 1;
+                return 0;
             case 'f':
                 if(atoi(optarg) < 1) framerate = 0;
-                else framerate = 1000000 / atoi(optarg);
+                else framerate = 1000 / atoi(optarg);
                 break;
             case 't':
                 maxtemp = atoi(optarg);
