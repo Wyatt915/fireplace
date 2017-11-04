@@ -177,7 +177,9 @@ void nextframe(int** field, int** count, int* hotplate){
 }
 
 //Wolfram's Elementary cellular atomaton
-void wolfram(int* world, int* next, const int rule){
+//https://en.wikipedia.org/wiki/Elementary_cellular_automaton
+void wolfram(int* world, const int rule){
+    int* next = new int[WIDTH];
     int l,c,r;
     int lidx, ridx;
     int current;
@@ -194,6 +196,7 @@ void wolfram(int* world, int* next, const int rule){
     for(int i = 0; i < WIDTH; i++){
         world[i] = next[i];
     }
+    delete[] next;
 }
 
 //----------------------------------------[Draw and Animate]----------------------------------------
@@ -202,6 +205,7 @@ void printframe(int** field, int** count, int* hotplate){
     char disp;
     for(int i = 0; i < HEIGHT; i++){
         for(int j = 0; j < WIDTH; j++){
+            
             move(i,j);
             //if the cell is cold, print a space, otherwise print [dispch]
             int color = (7 * field[i][j] / maxtemp) + 1;
@@ -212,7 +216,6 @@ void printframe(int** field, int** count, int* hotplate){
             attroff(COLOR_PAIR(color));
         }
     }
-    //mvaddstr(0, 0, std::to_string(wolfrule).c_str());
     refresh();
 }
 
@@ -220,18 +223,18 @@ void flames(){
     int** field = init(HEIGHT, WIDTH); //The cells that will be displayed
     int** count = init(HEIGHT, WIDTH); //A grid of cells used to tally neighbors for CA purposes
     int* heater = new int[WIDTH]; //these special cells provide "heat" at the bottom of the screen.
-    int* heater_count = new int[WIDTH];
     int* hotplate = new int[WIDTH]; //The heater heats the hotplate. The hotplate will cool without heat.
     
     for(int i = 0; i < WIDTH; i++){
         heater[i] = rand() % 2;
+        hotplate[i] = 0;
     }
     
     char c = 0;
     
     while(sig_caught == 0){
-        //Use Rule 60 (http://mathworld.wolfram.com/Rule60.html) to make flames flicker nicely.
-        wolfram(heater, heater_count, wolfrule);
+        //Use Rule 60 to make flames flicker nicely.
+        wolfram(heater, wolfrule);
         warm(heater, hotplate);
         printframe(field, count, hotplate);
         nextframe(field, count, hotplate);
@@ -241,12 +244,11 @@ void flames(){
     refresh();
     delete[] hotplate;
     delete[] heater;
-    delete[] heater_count;
     deallocate(field, HEIGHT);
     deallocate(count, HEIGHT);
 }
 
-//------------------------------------[Miscellaneous Functions]-------------------------------------
+//----------------------------------------------[Help]----------------------------------------------
 
 void printhelp(char progname[]){
     std::cout << "\nUsage: " << progname << " [options]\n"
@@ -260,16 +262,25 @@ void printhelp(char progname[]){
         << "Press ^C at any time to douse the flames.\n\n";
 }
 
-void signal_handler(int signum){
+//--------------------------------------------[Signals]---------------------------------------------
+
+void sigint_handler(int signum){
     if(signum == SIGINT){
         sig_caught = 1;
+    }
+}
+
+void sigwinch_handler(int signum){
+    if(signum == SIGWINCH){
+        sig_caught = 2;
     }
 }
 
 //----------------------------------------------[Main]----------------------------------------------
 
 int main(int argc, char** argv){
-    signal(SIGINT, signal_handler);
+    signal(SIGINT, sigint_handler);
+    signal(SIGWINCH, sigwinch_handler);
     
     int persecond = 1000000;
     srand(time(NULL));
@@ -310,11 +321,18 @@ int main(int argc, char** argv){
     }
     color_val* colors = new color_val[8];
     start_ncurses(colors);
-    flames();
-    clear();
-    refresh();
+    while(sig_caught != 1){
+        sig_caught = 0;
+        getmaxyx(stdscr, HEIGHT, WIDTH);
+        flames();
+        endwin();
+        clear();
+        refresh();
+    }
     restore_colors(colors);
     delete[] colors;
+    clear();
+    refresh();
     endwin();
     return 0;
 }
