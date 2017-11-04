@@ -1,3 +1,16 @@
+/***************************************************************************************************
+*                                                                                                  *
+*                                           Fireplace                                              *
+*                                                                                                  *
+*   File:      main.cpp                                                                            *
+*   Author:    Wyatt Sheffield and GitHub contributors                                             *
+*                                                                                                  *
+*   Lights a cozy fire in your terminal. Goes well with coffee.                                    *
+*                                                                                                  *
+*                   Copyright (c) 2017 Wyatt Sheffield and GitHub contributors                     *
+*                                                                                                  *
+***************************************************************************************************/
+
 #include <ctime>
 #include <iostream>
 #include <ncurses.h>
@@ -19,7 +32,7 @@ static int wolfrule;       //rule for wolfram eca
 
 static volatile sig_atomic_t sig_caught = 0;
 
-//--------------------------------------------[Structs]--------------------------------------------
+//--------------------------------------------[Structs]---------------------------------------------
 
 struct color_val{ short r,g,b; };
 
@@ -85,7 +98,7 @@ void restore_colors(color_val* colors){
     }
 }
 
-//-----------------------------------[Cellular Automata Helpers]-----------------------------------
+//-----------------------------------[Cellular Automata Helpers]------------------------------------
 
 //As a cell cools it has a higher chance of cooling again on the next frame.
 int cooldown(int heat){
@@ -112,7 +125,7 @@ void warm(int* heater, int* hotplate){
     }
 }
 
-//---------------------------------------[Cellular Automata]---------------------------------------
+//---------------------------------------[Cellular Automata]----------------------------------------
 
 void nextframe(int** field, int** count, int* hotplate){
     cleargrid(count, heightrecord);
@@ -233,7 +246,7 @@ void flames(){
     deallocate(count, HEIGHT);
 }
 
-//---------------------------------------------[Misc.]---------------------------------------------
+//------------------------------------[Miscellaneous Functions]-------------------------------------
 
 void printhelp(char progname[]){
     std::cout << "\nUsage: " << progname << " [options]\n"
@@ -298,6 +311,8 @@ int main(int argc, char** argv){
     color_val* colors = new color_val[8];
     start_ncurses(colors);
     flames();
+    clear();
+    refresh();
     restore_colors(colors);
     delete[] colors;
     endwin();
