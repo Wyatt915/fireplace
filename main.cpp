@@ -35,7 +35,6 @@ static int maxtemp;        //maximum flame temperature
 static int wolfrule;       //rule for wolfram eca
 
 static volatile sig_atomic_t sig_caught = 0;
-static volatile sig_atomic_t cease_flames = 0;
 
 //--------------------------------------------[Structs]---------------------------------------------
 
