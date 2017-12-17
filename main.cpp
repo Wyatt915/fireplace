@@ -18,6 +18,10 @@
 #include <stdlib.h> //random
 #include <unistd.h> //usleep, getopt
 
+#ifdef _WIN32
+#include <windows.h> //Sleep
+#endif
+
 #define MIN(X, Y)  ((X) < (Y) ? (X) : (Y))
 #define MAX(X, Y)  ((X) > (Y) ? (X) : (Y))
 
@@ -38,32 +42,34 @@ struct color_val{ short r,g,b; };
 
 //------------------------------[Memory Management and Initialization]------------------------------
 
-int** init(int y, int x){
+int** init(int y, int x) {
     int** out = new int*[y];
-    for(int i = 0; i < y; i++){
+    for (int i = 0; i < y; i++) {
         out[i] = new int[x];
     }
 
-    for(int i = 0; i < y; i++){
-        for(int j = 0; j < x; j++){
+    for (int i = 0; i < y; i++) {
+        for (int j = 0; j < x; j++) {
             out[i][j] = 0;
         }
     }
     return out;
 }
 
-void deallocate(int** in, int rows){
-    for(int i = 0; i < rows; i++){
+void deallocate(int** in, int rows)
+{
+    for (int i = 0; i < rows; i++) {
         delete[] in[i];
     }
     delete[] in;
 }
 
-void start_ncurses(color_val* colors){
+void start_ncurses(color_val* colors)
+{
     initscr();
     start_color();
     
-    for(int i = 0; i < 8; i++){
+    for (int i = 0; i < 8; i++) {
         color_content(i, &colors[i].r, &colors[i].g, &colors[i].b);
     }
     
@@ -85,6 +91,7 @@ void start_ncurses(color_val* colors){
     init_pair(7,  COLOR_WHITE,    COLOR_BLACK);
     curs_set(0);    //invisible cursor
     timeout(0);     //make getch() non-blocking
+
     cbreak();
     noecho();
     keypad(stdscr, TRUE); 
@@ -92,8 +99,9 @@ void start_ncurses(color_val* colors){
     heightrecord = HEIGHT;
 }
 
-void restore_colors(color_val* colors){
-    for(int i = 0; i < 8; i++){
+void restore_colors(color_val* colors)
+{
+    for (int i = 0; i < 8; i++) {
         init_color(i, colors[i].r, colors[i].g, colors[i].b);
     }
 }
@@ -101,40 +109,43 @@ void restore_colors(color_val* colors){
 //-----------------------------------[Cellular Automata Helpers]------------------------------------
 
 //As a cell cools it has a higher chance of cooling again on the next frame.
-int cooldown(int heat){
-    if(heat == 0) return 0;
+int cooldown(int heat) {
+    if (heat == 0) return 0;
     int r = (rand() % heat);
-    if(r == 0) heat--;
+    if (r == 0) heat--;
     return heat;
 }
 
-void cleargrid(int** grid, int h){
-    for(int i = h; i < HEIGHT; i++){
-        for(int j = 0; j < WIDTH; j++){
+void cleargrid(int** grid, int h)
+{
+    for (int i = h; i < HEIGHT; i++) {
+        for (int j = 0; j < WIDTH; j++) {
             grid[i][j] = 0;
         }
     }
 }
 
-void warm(int* heater, int* hotplate){
-    for(int i = 0; i < WIDTH; i++){
+void warm(int* heater, int* hotplate)
+{
+    for (int i = 0; i < WIDTH; i++) {
         hotplate[i] /= 2;
     }
-    for(int i = 0; i < WIDTH; i++){
+    for (int i = 0; i < WIDTH; i++) {
         hotplate[i] += heater[i] * maxtemp;
     }
 }
 
 //---------------------------------------[Cellular Automata]----------------------------------------
 
-void nextframe(int** field, int** count, int* hotplate){
+void nextframe(int** field, int** count, int* hotplate)
+{
     cleargrid(count, heightrecord);
     int rowsum = 0;
     int h = heightrecord - 3;
     h = MAX(h, 1);  //we can ignore the vast majority of cold cells
                     //and skip down to the bottom of the window
-    for(int i = h; i <= HEIGHT; i++){
-        for(int j = 0; j < WIDTH; j++){
+    for (int i = h; i <= HEIGHT; i++) {
+        for (int j = 0; j < WIDTH; j++) {
             float avg = 0;
             //int temp = rand() % maxtemp * 4;
             int counter = 0;
@@ -145,16 +156,16 @@ void nextframe(int** field, int** count, int* hotplate){
             //    .......
             //    .......
             //    .......
-            for(int xoff = -3; xoff <= 3; xoff++){
-                for(int yoff = -1; yoff <= 3; yoff++){
+            for (int xoff = -3; xoff <= 3; xoff++) {
+                for (int yoff = -1; yoff <= 3; yoff++) {
                     int y = i + yoff;
                     y = MAX(y,0); //if y is less than zero, clamp it to zero.
                     int x = j + xoff;
                     //if the search has gon beyond the left or right, no heat is added
-                    if(x < 0 || x >= WIDTH) avg += 0;
+                    if (x < 0 || x >= WIDTH) avg += 0;
                     //if the search goes below the screen, add the hotplate value.
                     //the hotplate has infinite depth.
-                    else if(y >= HEIGHT)  avg += hotplate[x];
+                    else if (y >= HEIGHT)  avg += hotplate[x];
                     else avg += field[y][x];
                     counter++;
                 }
@@ -165,12 +176,12 @@ void nextframe(int** field, int** count, int* hotplate){
             count[i - 1][j] = cooldown(avg);
             rowsum += count[i-1][j];
         }
-        if(rowsum > 0 && i < heightrecord) heightrecord = i;
+        if (rowsum > 0 && i < heightrecord) heightrecord = i;
         rowsum = 0;
     }
     
-    for(int i = 0; i < HEIGHT; i++){
-        for(int j = 0; j < WIDTH; j++){
+    for (int i = 0; i < HEIGHT; i++) {
+        for (int j = 0; j < WIDTH; j++) {
             field[i][j] = count[i][j];
         }
     }
@@ -178,12 +189,13 @@ void nextframe(int** field, int** count, int* hotplate){
 
 //Wolfram's Elementary cellular atomaton
 //https://en.wikipedia.org/wiki/Elementary_cellular_automaton
-void wolfram(int* world, const int rule){
+void wolfram(int* world, const int rule)
+{
     int* next = new int[WIDTH];
     int l,c,r;
     int lidx, ridx;
     int current;
-    for(int i = 0; i < WIDTH; i++){
+    for (int i = 0; i < WIDTH; i++) {
         lidx = i > 0 ? i - 1 : WIDTH - 1;
         ridx = (i + 1) % WIDTH;
         l = world[lidx];
@@ -193,7 +205,7 @@ void wolfram(int* world, const int rule){
         next[i] = ((1<<current) & rule) > 0 ? 1 : 0;
     }
 
-    for(int i = 0; i < WIDTH; i++){
+    for (int i = 0; i < WIDTH; i++) {
         world[i] = next[i];
     }
     delete[] next;
@@ -201,10 +213,11 @@ void wolfram(int* world, const int rule){
 
 //----------------------------------------[Draw and Animate]----------------------------------------
 
-void printframe(int** field, int** count, int* hotplate){
+void printframe(int** field, int** count, int* hotplate)
+{
     char disp;
-    for(int i = 0; i < HEIGHT; i++){
-        for(int j = 0; j < WIDTH; j++){
+    for (int i = 0; i < HEIGHT; i++) {
+        for (int j = 0; j < WIDTH; j++) {
             
             move(i,j);
             //if the cell is cold, print a space, otherwise print [dispch]
@@ -219,26 +232,32 @@ void printframe(int** field, int** count, int* hotplate){
     refresh();
 }
 
-void flames(){
+void flames()
+{
     int** field = init(HEIGHT, WIDTH); //The cells that will be displayed
     int** count = init(HEIGHT, WIDTH); //A grid of cells used to tally neighbors for CA purposes
     int* heater = new int[WIDTH]; //these special cells provide "heat" at the bottom of the screen.
     int* hotplate = new int[WIDTH]; //The heater heats the hotplate. The hotplate will cool without heat.
     
-    for(int i = 0; i < WIDTH; i++){
+    for (int i = 0; i < WIDTH; i++) {
         heater[i] = rand() % 2;
         hotplate[i] = 0;
     }
     
     char c = 0;
     
-    while(sig_caught == 0){
+    while (sig_caught == 0 && (c = getch()) != 'q') {
+        if (c == 'q') sig_caught = 1;
         //Use Rule 60 to make flames flicker nicely.
         wolfram(heater, wolfrule);
         warm(heater, hotplate);
         printframe(field, count, hotplate);
         nextframe(field, count, hotplate);
-        usleep(framerate);
+        #ifdef _WIN32
+            Sleep(framerate);
+        #elif __linux__
+            usleep(framerate);
+        #endif
     }
 
     refresh();
@@ -250,7 +269,8 @@ void flames(){
 
 //----------------------------------------------[Help]----------------------------------------------
 
-void printhelp(char progname[]){
+void printhelp(char progname[])
+{
     std::cout << "\nUsage: " << progname << " [options]\n"
         << "\t-c character\tAn ASCII character to draw the flames. Default is '@'.\n"
         << "\t-h\t\tPrint this message.\n"
@@ -264,21 +284,24 @@ void printhelp(char progname[]){
 
 //--------------------------------------------[Signals]---------------------------------------------
 
-void sigint_handler(int signum){
-    if(signum == SIGINT){
+void sigint_handler(int signum)
+{
+    if (signum == SIGINT) {
         sig_caught = 1;
     }
 }
 
-void sigwinch_handler(int signum){
-    if(signum == SIGWINCH){
+void sigwinch_handler(int signum)
+{
+    if (signum == SIGWINCH) {
         sig_caught = 2;
     }
 }
 
 //----------------------------------------------[Main]----------------------------------------------
 
-int main(int argc, char** argv){
+int main(int argc, char** argv)
+{
     signal(SIGINT, sigint_handler);
     signal(SIGWINCH, sigwinch_handler);
     
@@ -291,8 +314,8 @@ int main(int argc, char** argv){
     
     int c;
     opterr = 0;
-    while((c = getopt(argc, argv, "c:hf:t:w:")) != -1){
-        switch (c){
+    while ((c = getopt(argc, argv, "c:hf:t:w:")) != -1) {
+        switch (c) {
             case 'c':
                 dispch = optarg[0];
                 break;
@@ -301,7 +324,7 @@ int main(int argc, char** argv){
                 std::cout << COLORS <<std::endl;
                 return 0;
             case 'f':
-                if(atoi(optarg) < 1) framerate = 0;
+                if (atoi(optarg) < 1) framerate = 0;
                 else framerate = persecond / atoi(optarg);
                 break;
             case 't':
@@ -321,13 +344,13 @@ int main(int argc, char** argv){
     }
     color_val* colors = new color_val[8];
     start_ncurses(colors);
-    while(sig_caught != 1){
-        sig_caught = 0;
+    while (sig_caught != 1) {
         getmaxyx(stdscr, HEIGHT, WIDTH);
         flames();
         endwin();
         clear();
         refresh();
+        if (sig_caught == 0) break;
     }
     restore_colors(colors);
     delete[] colors;
