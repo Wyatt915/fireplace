@@ -321,7 +321,6 @@ int main(int argc, char** argv)
                 break;
             case 'h':
                 printhelp(argv[0]);
-                std::cout << COLORS <<std::endl;
                 return 0;
             case 'f':
                 if (atoi(optarg) < 1) framerate = 0;
