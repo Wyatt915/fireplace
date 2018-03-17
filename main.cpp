@@ -202,7 +202,7 @@ void wolfram(int* world, const int rule)
         c = world[i];
         r = world[ridx];
         current = (l<<2) | (c<<1) | r;
-        next[i] = ((1<<current) & rule) > 0 ? 1 : 0;
+        next[i] = (rule>>current) & 0b1;
     }
 
     for (int i = 0; i < WIDTH; i++) {
