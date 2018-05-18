@@ -17,6 +17,7 @@
 #include <signal.h>
 #include <stdlib.h> //random
 #include <unistd.h> //usleep, getopt
+#include <fstream>
 
 #define MIN(X, Y)  ((X) < (Y) ? (X) : (Y))
 #define MAX(X, Y)  ((X) > (Y) ? (X) : (Y))
@@ -108,6 +109,7 @@ int cooldown(int heat){
     return heat;
 }
 
+//zeroes every row after row h
 void cleargrid(int** grid, int h){
     for(int i = h; i < HEIGHT; i++){
         for(int j = 0; j < WIDTH; j++){
@@ -116,6 +118,8 @@ void cleargrid(int** grid, int h){
     }
 }
 
+//the hotplate cools down, and is then
+//warmed back up by the heater
 void warm(int* heater, int* hotplate){
     for(int i = 0; i < WIDTH; i++){
         hotplate[i] /= 2;
@@ -201,7 +205,7 @@ void wolfram(int* world, const int rule){
 
 //----------------------------------------[Draw and Animate]----------------------------------------
 
-void printframe(int** field, int** count, int* hotplate){
+void printframe(int** field){
     char disp;
     for(int i = 0; i < HEIGHT; i++){
         for(int j = 0; j < WIDTH; j++){
@@ -217,6 +221,36 @@ void printframe(int** field, int** count, int* hotplate){
         }
     }
     refresh();
+}
+static int framecount = 0;
+//outputs a ppm image instead of drawing via ncurses
+void printppm(int** field){
+    int flame_colors[8][3] ={{100,   100,   100},
+                             {300,   0,     0},
+                             {500,   0,     0},
+                             {700,   100,   0},
+                             {900,   300,   0},
+                             {1000,  500,   100},
+                             {1000,  800,   500},
+                             {1000,  1000,  1000}};
+    char buffer [10];
+    sprintf(buffer, "%06d", framecount);
+    std::string fname = buffer;
+    fname = "img/" + fname + ".ppm";
+    std::ofstream outfile(fname.c_str());
+    outfile << "P3\n" << WIDTH << ' ' << HEIGHT << "\n1000\n";
+    for(int i = 0; i < HEIGHT; i++){
+        for(int j = 0; j < WIDTH; j++){
+            int color = (7 * field[i][j] / maxtemp) + 1;
+            color = MIN(color,7);
+            outfile << flame_colors[color][0] << ' '
+                    << flame_colors[color][1] << ' '
+                    << flame_colors[color][2] << ' ';
+        }
+        outfile << '\n';
+    }
+    outfile.close();
+    framecount++;
 }
 
 void flames(){
@@ -236,7 +270,8 @@ void flames(){
         //Use Rule 60 to make flames flicker nicely.
         wolfram(heater, wolfrule);
         warm(heater, hotplate);
-        printframe(field, count, hotplate);
+        //printframe(field);
+        printppm(field);
         nextframe(field, count, hotplate);
         usleep(framerate);
     }
@@ -324,6 +359,8 @@ int main(int argc, char** argv){
     while(sig_caught != 1){
         sig_caught = 0;
         getmaxyx(stdscr, HEIGHT, WIDTH);
+        WIDTH = 129;
+        HEIGHT = 129;
         flames();
         endwin();
         clear();

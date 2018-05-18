@@ -1,13 +1,12 @@
-DESTDIR ?= $(HOME)
-PREFIX ?= /usr
-BINDIR ?= $(PREFIX)/bin
+DESTDIR ?= $(HOME)/bin
+EXEC = fireplace
 
 all:
-	g++ -std=c++14 main.cpp -lncurses -O3 -o fireplace
+	g++ -std=c++14 main.cpp -lncurses -O3 -o $(EXEC)
 
 install:
-	install -d $(DESTDIR)/$(BINDIR)
-	install -m 755 fireplace $(DESTDIR)/$(BINDIR)
+	install -d $(DESTDIR)
+	install -m 755 $(EXEC) $(DESTDIR)
 
 uninstall:
-	rm $(DESTDIR)/$(BINDIR)/fireplace
+	rm $(DESTDIR)/$(EXEC)
