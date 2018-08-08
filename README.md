@@ -20,6 +20,3 @@ Usage: ./fireplace [options]
 
 Press q at any time to douse the flames.
 ```
-
-### Preview
-![fireplace gif](https://i.imgur.com/wBIbsFw.gif)
