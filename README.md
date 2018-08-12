@@ -1,6 +1,8 @@
 # Fireplace
 A cozy fireplace in your terminal
 
+![A gif of what to expect](demo.gif?raw=true "Cozy")
+
 ## Build and Run
 
 * Install ncurses

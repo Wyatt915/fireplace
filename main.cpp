@@ -247,7 +247,6 @@ void flames()
     char c = 0;
     
     while (sig_caught == 0 && (c = getch()) != 'q') {
-        if (c == 'q') sig_caught = 1;
         //Use Rule 60 to make flames flicker nicely.
         wolfram(heater, wolfrule);
         warm(heater, hotplate);
@@ -260,6 +259,8 @@ void flames()
         #endif
     }
 
+    if (c == 'q') raise(SIGINT);
+    
     refresh();
     delete[] hotplate;
     delete[] heater;
@@ -267,6 +268,16 @@ void flames()
     deallocate(count, HEIGHT);
 }
 
+void run(){
+    while(sig_caught != 1){
+        getmaxyx(stdscr, HEIGHT, WIDTH);
+        flames();
+        endwin();
+        clear();
+        refresh();
+        if (sig_caught == 2) sig_caught = 0;
+    }
+}
 //----------------------------------------------[Help]----------------------------------------------
 
 void printhelp(char progname[])
@@ -284,15 +295,11 @@ void printhelp(char progname[])
 
 //--------------------------------------------[Signals]---------------------------------------------
 
-void sigint_handler(int signum)
+void sig_handler(int signum)
 {
     if (signum == SIGINT) {
         sig_caught = 1;
     }
-}
-
-void sigwinch_handler(int signum)
-{
     if (signum == SIGWINCH) {
         sig_caught = 2;
     }
@@ -300,10 +307,11 @@ void sigwinch_handler(int signum)
 
 //----------------------------------------------[Main]----------------------------------------------
 
+
 int main(int argc, char** argv)
 {
-    signal(SIGINT, sigint_handler);
-    signal(SIGWINCH, sigwinch_handler);
+    signal(SIGINT, sig_handler);
+    signal(SIGWINCH, sig_handler);
     
     int persecond = 1000000;
     srand(time(NULL));
@@ -343,14 +351,7 @@ int main(int argc, char** argv)
     }
     color_val* colors = new color_val[8];
     start_ncurses(colors);
-    while (sig_caught != 1) {
-        getmaxyx(stdscr, HEIGHT, WIDTH);
-        flames();
-        endwin();
-        clear();
-        refresh();
-        if (sig_caught == 0) break;
-    }
+    run();
     restore_colors(colors);
     delete[] colors;
     clear();
