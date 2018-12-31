@@ -68,11 +68,11 @@ void start_ncurses(color_val* colors)
 {
     initscr();
     start_color();
-    
+
     for (int i = 0; i < 8; i++) {
         color_content(i, &colors[i].r, &colors[i].g, &colors[i].b);
     }
-    
+
     init_color(COLOR_BLACK,    100,   100,   100);
     init_color(COLOR_RED,      300,   0,     0);
     init_color(COLOR_GREEN,    500,   0,     0);
@@ -81,7 +81,7 @@ void start_ncurses(color_val* colors)
     init_color(COLOR_MAGENTA,  1000,  500,   100);
     init_color(COLOR_CYAN,     1000,  800,   500);
     init_color(COLOR_WHITE,    1000,  1000,  1000);
-    
+
     init_pair(1,  COLOR_RED,      COLOR_BLACK);
     init_pair(2,  COLOR_GREEN,    COLOR_BLACK);
     init_pair(3,  COLOR_BLUE,     COLOR_BLACK);
@@ -94,7 +94,7 @@ void start_ncurses(color_val* colors)
 
     cbreak();
     noecho();
-    keypad(stdscr, TRUE); 
+    keypad(stdscr, TRUE);
     getmaxyx(stdscr, HEIGHT, WIDTH);
     heightrecord = HEIGHT;
 }
@@ -179,7 +179,7 @@ void nextframe(int** field, int** count, int* hotplate)
         if (rowsum > 0 && i < heightrecord) heightrecord = i;
         rowsum = 0;
     }
-    
+
     for (int i = 0; i < HEIGHT; i++) {
         for (int j = 0; j < WIDTH; j++) {
             field[i][j] = count[i][j];
@@ -213,12 +213,12 @@ void wolfram(int* world, const int rule)
 
 //----------------------------------------[Draw and Animate]----------------------------------------
 
-void printframe(int** field, int** count, int* hotplate)
+void printframe(int** field, int** count)
 {
     char disp;
     for (int i = 0; i < HEIGHT; i++) {
         for (int j = 0; j < WIDTH; j++) {
-            
+
             move(i,j);
             //if the cell is cold, print a space, otherwise print [dispch]
             int color = (7 * field[i][j] / maxtemp) + 1;
@@ -238,19 +238,21 @@ void flames()
     int** count = init(HEIGHT, WIDTH); //A grid of cells used to tally neighbors for CA purposes
     int* heater = new int[WIDTH]; //these special cells provide "heat" at the bottom of the screen.
     int* hotplate = new int[WIDTH]; //The heater heats the hotplate. The hotplate will cool without heat.
-    
+
     for (int i = 0; i < WIDTH; i++) {
         heater[i] = rand() % 2;
         hotplate[i] = 0;
     }
-    
-    char c = 0;
-    
+
+    int c = 0;
+
     while (sig_caught == 0 && (c = getch()) != 'q') {
         //Use Rule 60 to make flames flicker nicely.
+        if(c == KEY_UP) maxtemp++;
+        if(c == KEY_DOWN && maxtemp > 1) maxtemp--;
         wolfram(heater, wolfrule);
         warm(heater, hotplate);
-        printframe(field, count, hotplate);
+        printframe(field, count);
         nextframe(field, count, hotplate);
         #ifdef _WIN32
             Sleep(framerate);
@@ -260,7 +262,7 @@ void flames()
     }
 
     if (c == 'q') raise(SIGINT);
-    
+
     refresh();
     delete[] hotplate;
     delete[] heater;
@@ -288,7 +290,8 @@ void printhelp(char progname[])
         << "\t-f framerate\tSet the framerate in frames/sec. Default is 20.\n"
         << "\t\t\tA framerate of zero will make frames spit out as soon as they are ready.\n"
         << "\t-t temp\t\tSet the maximum temperature of the flames. Default is 10.\n"
-        << "\t\t\tA higher temp means taller flames.\n"
+        << "\t\t\tA higher temp means taller flames. Press the up/down arrows\n"
+        << "\t\t\tto change the temperature at any time.\n"
         << "\n"
         << "Press ^C at any time to douse the flames.\n\n";
 }
@@ -312,14 +315,14 @@ int main(int argc, char** argv)
 {
     signal(SIGINT, sig_handler);
     signal(SIGWINCH, sig_handler);
-    
+
     int persecond = 1000000;
     srand(time(NULL));
     framerate = persecond / 20;
     maxtemp = 10;
     dispch = '@';
     wolfrule = 60;
-    
+
     int c;
     opterr = 0;
     while ((c = getopt(argc, argv, "c:hf:t:w:")) != -1) {
