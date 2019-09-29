@@ -47,20 +47,14 @@ static volatile sig_atomic_t sig_caught = 0;
 
 //--------------------------------------------[Structs]---------------------------------------------
 
-struct color_val{ short r,g,b; };
+typedef struct colorvalstruct{ short r,g,b; } color_val;
 
 //------------------------------[Memory Management and Initialization]------------------------------
 
 int** init(int y, int x) {
-    int** out = new int*[y];
+    int** out = malloc(y * sizeof(int*));
     for (int i = 0; i < y; i++) {
-        out[i] = new int[x];
-    }
-
-    for (int i = 0; i < y; i++) {
-        for (int j = 0; j < x; j++) {
-            out[i][j] = 0;
-        }
+        out[i] = calloc(x, sizeof(int));
     }
     return out;
 }
@@ -68,9 +62,9 @@ int** init(int y, int x) {
 void deallocate(int** in, int rows)
 {
     for (int i = 0; i < rows; i++) {
-        delete[] in[i];
+        free(in[i]);
     }
-    delete[] in;
+    free(in);
 }
 
 void start_ncurses(color_val* colors)
@@ -210,7 +204,7 @@ void nextframe(int** field, int** count, int* hotplate)
 //https://en.wikipedia.org/wiki/Elementary_cellular_automaton
 void wolfram(int* world, const int rule)
 {
-    int* next = new int[WIDTH];
+    int* next = malloc(WIDTH * sizeof(int));
     int l,c,r;
     int lidx, ridx;
     int current;
@@ -227,7 +221,7 @@ void wolfram(int* world, const int rule)
     for (int i = 0; i < WIDTH; i++) {
         world[i] = next[i];
     }
-    delete[] next;
+    free(next);
 }
 
 //----------------------------------------[Draw and Animate]----------------------------------------
@@ -255,8 +249,10 @@ void flames()
 {
     int** field = init(HEIGHT, WIDTH); //The cells that will be displayed
     int** count = init(HEIGHT, WIDTH); //A grid of cells used to tally neighbors for CA purposes
-    int* heater = new int[WIDTH]; //these special cells provide "heat" at the bottom of the screen.
-    int* hotplate = new int[WIDTH]; //The heater heats the hotplate. The hotplate will cool without heat.
+    // these special cells provide "heat" at the bottom of the screen.
+    int* heater = malloc(WIDTH * sizeof(int));
+    // The heater heats the hotplate. The hotplate will cool without heat.
+    int* hotplate = malloc(WIDTH * sizeof(int));
 
     for (int i = 0; i < WIDTH; i++) {
         heater[i] = rand() % 2;
@@ -283,10 +279,8 @@ void flames()
     if (c == 'q') raise(SIGINT);
 
     refresh();
-    delete[] hotplate;
-    delete[] heater;
-    deallocate(field, HEIGHT);
-    deallocate(count, HEIGHT);
+    free(hotplate); free(heater);
+    deallocate(field, HEIGHT); deallocate(count, HEIGHT);
 }
 
 void run(){
@@ -301,18 +295,19 @@ void run(){
 }
 //----------------------------------------------[Help]----------------------------------------------
 
-void printhelp(char progname[])
+void printhelp(const char progname[])
 {
-    std::cout << "\nUsage: " << progname << " [options]\n"
-        << "\t-c character\tAn ASCII character to draw the flames. Default is '@'.\n"
-        << "\t-h\t\tPrint this message.\n"
-        << "\t-f framerate\tSet the framerate in frames/sec. Default is 20.\n"
-        << "\t\t\tA framerate of zero will make frames spit out as soon as they are ready.\n"
-        << "\t-t temp\t\tSet the maximum temperature of the flames. Default is 10.\n"
-        << "\t\t\tA higher temp means taller flames. Press the up/down arrows\n"
-        << "\t\t\tto change the temperature at any time.\n"
-        << "\n"
-        << "Press ^C or q at any time to douse the flames.\n\n";
+    const char fmtstr[] =
+        "\nUsage: %s [options]\n"\
+        "\t-c character\tAn ASCII character to draw the flames. Default is '@'.\n"\
+        "\t-h\t\tPrint this message.\n"\
+        "\t-f framerate\tSet the framerate in frames/sec. Default is 20.\n"\
+        "\t\t\tA framerate of zero will make frames spit out as soon as they are ready.\n"\
+        "\t-t temp\t\tSet the maximum temperature of the flames. Default is 10.\n"\
+        "\t\t\tA higher temp means taller flames. Press the up/down arrows\n"\
+        "\t\t\tto change the temperature at any time.\n\n"\
+        "Press ^C or q at any time to douse the flames.\n\n";
+    fprintf(stderr, fmtstr, progname);
 }
 
 //--------------------------------------------[Signals]---------------------------------------------
@@ -371,13 +366,13 @@ int main(int argc, char** argv)
                 return 2;
         }
     }
-    color_val* colors = new color_val[8];
+    color_val* colors = malloc(8 * sizeof(color_val));
     start_ncurses(colors);
     run();
     if(COLORS < 256){
         restore_colors(colors);
     }
-    delete[] colors;
+    free(colors);
     clear();
     refresh();
     endwin();

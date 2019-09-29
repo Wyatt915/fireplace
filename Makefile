@@ -1,8 +1,11 @@
+CC = gcc
+CFLAGS = -O3
+LNFLAGS = -lncurses
 DESTDIR ?= $(HOME)/bin
 EXEC = fireplace
 
 all:
-	g++ -std=c++14 main.cpp -lncurses -O3 -o $(EXEC)
+	$(CC) main.cpp $(CFLAGS) $(LNFLAGS) -o $(EXEC)
 
 install:
 	install -d $(DESTDIR)
