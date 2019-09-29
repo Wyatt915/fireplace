@@ -11,7 +11,7 @@
 *                                             o888o                                                *
 *                                                                                                  *
 *                                                                                                  *
-*   File:      main.cpp                                                                            *
+*   File:      main.c                                                                              *
 *   Author:    Wyatt Sheffield                                                                     *
 *                                                                                                  *
 *   Lights a cozy fire in your terminal. Goes well with coffee.                                    *
