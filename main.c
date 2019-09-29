@@ -20,8 +20,7 @@
 *                                                                                                  *
 ***************************************************************************************************/
 
-#include <ctime>
-#include <iostream>
+#include <time.h>
 #include <ncurses.h>
 #include <signal.h>
 #include <stdlib.h> //random
@@ -358,11 +357,11 @@ int main(int argc, char** argv)
                 wolfrule = atoi(optarg);
                 break;
             case '?':
-                std::cout << "\nYou've really bunged this one up. Here, this may help:\n";
+                fprintf(stderr, "\nYou've really bunged this one up. Here, this may help:\n");
                 printhelp(argv[0]);
                 return 1;
             default:
-                std::cerr << "What the hell?!";
+                fprintf(stderr, "What the hell?!");
                 return 2;
         }
     }

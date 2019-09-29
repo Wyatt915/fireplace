@@ -5,7 +5,7 @@ DESTDIR ?= $(HOME)/bin
 EXEC = fireplace
 
 all:
-	$(CC) main.cpp $(CFLAGS) $(LNFLAGS) -o $(EXEC)
+	$(CC) main.c $(CFLAGS) $(LNFLAGS) -o $(EXEC)
 
 install:
 	install -d $(DESTDIR)
