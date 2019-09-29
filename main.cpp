@@ -1,9 +1,18 @@
 /***************************************************************************************************
 *                                                                                                  *
-*                                           Fireplace                                              *
+*       oooooooooooo  o8o                                oooo                                      *
+*       `888'     `8  `"'                                `888                                      *
+*        888         oooo  oooo d8b  .ooooo.  oo.ooooo.   888   .oooo.    .ooooo.   .ooooo.        *
+*        888oooo8    `888  `888""8P d88' `88b  888' `88b  888  `P  )88b  d88' `"Y8 d88' `88b       *
+*        888    "     888   888     888ooo888  888   888  888   .oP"888  888       888ooo888       *
+*        888          888   888     888    .o  888   888  888  d8(  888  888   .o8 888    .o       *
+*       o888o        o888o d888b    `Y8bod8P'  888bod8P' o888o `Y888""8o `Y8bod8P' `Y8bod8P'       *
+*                                              888                                                 *
+*                                             o888o                                                *
+*                                                                                                  *
 *                                                                                                  *
 *   File:      main.cpp                                                                            *
-*   Author:    Wyatt Sheffield and GitHub contributors                                             *
+*   Author:    Wyatt Sheffield                                                                     *
 *                                                                                                  *
 *   Lights a cozy fire in your terminal. Goes well with coffee.                                    *
 *                                                                                                  *
@@ -33,7 +42,7 @@ static int framerate;      //framerate
 static int heightrecord;   //max height reached by the flames
 static int maxtemp;        //maximum flame temperature
 static int wolfrule;       //rule for wolfram eca
-
+static int NUM_COLORS;     //Number of flame colors used
 static volatile sig_atomic_t sig_caught = 0;
 
 //--------------------------------------------[Structs]---------------------------------------------
@@ -68,27 +77,37 @@ void start_ncurses(color_val* colors)
 {
     initscr();
     start_color();
+    if (COLORS < 256){
+        for (int i = 0; i < 8; i++) {
+            color_content(i, &colors[i].r, &colors[i].g, &colors[i].b);
+        }
+        NUM_COLORS = 7;
+        init_color(COLOR_BLACK,    100,   100,   100);
+        init_color(COLOR_RED,      300,   0,     0);
+        init_color(COLOR_GREEN,    500,   0,     0);
+        init_color(COLOR_BLUE,     700,   100,   0);
+        init_color(COLOR_YELLOW,   900,   300,   0);
+        init_color(COLOR_MAGENTA,  1000,  500,   100);
+        init_color(COLOR_CYAN,     1000,  800,   500);
+        init_color(COLOR_WHITE,    1000,  1000,  1000);
 
-    for (int i = 0; i < 8; i++) {
-        color_content(i, &colors[i].r, &colors[i].g, &colors[i].b);
+        init_pair(1,  COLOR_RED,      COLOR_BLACK);
+        init_pair(2,  COLOR_GREEN,    COLOR_BLACK);
+        init_pair(3,  COLOR_BLUE,     COLOR_BLACK);
+        init_pair(4,  COLOR_YELLOW,   COLOR_BLACK);
+        init_pair(5,  COLOR_MAGENTA,  COLOR_BLACK);
+        init_pair(6,  COLOR_CYAN,     COLOR_BLACK);
+        init_pair(7,  COLOR_WHITE,    COLOR_BLACK);
     }
-
-    init_color(COLOR_BLACK,    100,   100,   100);
-    init_color(COLOR_RED,      300,   0,     0);
-    init_color(COLOR_GREEN,    500,   0,     0);
-    init_color(COLOR_BLUE,     700,   100,   0);
-    init_color(COLOR_YELLOW,   900,   300,   0);
-    init_color(COLOR_MAGENTA,  1000,  500,   100);
-    init_color(COLOR_CYAN,     1000,  800,   500);
-    init_color(COLOR_WHITE,    1000,  1000,  1000);
-
-    init_pair(1,  COLOR_RED,      COLOR_BLACK);
-    init_pair(2,  COLOR_GREEN,    COLOR_BLACK);
-    init_pair(3,  COLOR_BLUE,     COLOR_BLACK);
-    init_pair(4,  COLOR_YELLOW,   COLOR_BLACK);
-    init_pair(5,  COLOR_MAGENTA,  COLOR_BLACK);
-    init_pair(6,  COLOR_CYAN,     COLOR_BLACK);
-    init_pair(7,  COLOR_WHITE,    COLOR_BLACK);
+    else {
+        int x256[] = { 233, 52, 88, 124, 160, 166, 202, 208, 214, 220, 226, 227, 228, 229, 230, 231 };
+        NUM_COLORS = sizeof(x256)/sizeof(int);
+        // the first color in the list will be the background, so we start at 1.
+        for(size_t i = 1; i < NUM_COLORS; i++){
+            init_pair(i, x256[i], x256[0]);
+        }
+        NUM_COLORS -= 1;
+    }
     curs_set(0);    //invisible cursor
     timeout(0);     //make getch() non-blocking
 
@@ -221,8 +240,8 @@ void printframe(int** field, int** count)
 
             move(i,j);
             //if the cell is cold, print a space, otherwise print [dispch]
-            int color = (7 * field[i][j] / maxtemp) + 1;
-            color = MIN(color,7);
+            int color = (NUM_COLORS * field[i][j] / maxtemp) + 1;
+            color = MIN(color,NUM_COLORS);
             disp = field[i][j] == 0 ? ' ' : dispch;
             attron(COLOR_PAIR(color));
             addch(disp);
@@ -293,7 +312,7 @@ void printhelp(char progname[])
         << "\t\t\tA higher temp means taller flames. Press the up/down arrows\n"
         << "\t\t\tto change the temperature at any time.\n"
         << "\n"
-        << "Press ^C at any time to douse the flames.\n\n";
+        << "Press ^C or q at any time to douse the flames.\n\n";
 }
 
 //--------------------------------------------[Signals]---------------------------------------------
@@ -355,7 +374,9 @@ int main(int argc, char** argv)
     color_val* colors = new color_val[8];
     start_ncurses(colors);
     run();
-    restore_colors(colors);
+    if(COLORS < 256){
+        restore_colors(colors);
+    }
     delete[] colors;
     clear();
     refresh();
