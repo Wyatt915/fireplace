@@ -30,8 +30,8 @@
 #include <windows.h> //Sleep
 #endif
 
-#define MIN(X, Y)  ((X) < (Y) ? (X) : (Y))
-#define MAX(X, Y)  ((X) > (Y) ? (X) : (Y))
+#define cell_t int //the type of cell MUST be defined before including ncurses_ca_utils.
+#include "ncurses_ca_utils.h"
 
 //----------------------------------------[Global variables]----------------------------------------
 
@@ -50,20 +50,30 @@ typedef struct colorvalstruct{ short r,g,b; } color_val;
 
 //------------------------------[Memory Management and Initialization]------------------------------
 
-int** init(int y, int x) {
-    int** out = malloc(y * sizeof(int*));
-    for (int i = 0; i < y; i++) {
-        out[i] = calloc(x, sizeof(int));
+// Most of the interesting stuff is going on at the bottom of the screen. We will make sure all
+// those goodies get preserved on a window resize by flipping the screen upside down and then
+// copying like normal.
+void flip_grid(int*** grid, size_t rows, size_t cols){
+    int* temp = malloc(cols * sizeof(int));
+    for(size_t i = 0; i < rows/2; i++){
+        for (size_t j = 0; j < cols; j++){
+            temp[j] = (*grid)[rows-i-1][j];
+            (*grid)[rows-i-1][j] = (*grid)[i][j];
+        }
+        for (size_t j = 0; j < cols; j++){
+            (*grid)[i][j] = temp[j];
+        }
     }
-    return out;
 }
 
-void deallocate(int** in, int rows)
-{
-    for (int i = 0; i < rows; i++) {
-        free(in[i]);
+void resize_array(int** ary, size_t old, size_t new){
+    size_t n = MIN(old, new);
+    int* temp = calloc(new, sizeof(int));
+    for (size_t i = 0; i < n; i++){
+        temp[i] = (*ary)[i];
     }
-    free(in);
+    free(*ary);
+    *ary = temp;
 }
 
 void start_ncurses(color_val* colors)
@@ -128,11 +138,11 @@ int cooldown(int heat) {
     return heat;
 }
 
-void cleargrid(int** grid, int h)
+void cleargrid(int*** grid, int h)
 {
     for (int i = h; i < HEIGHT; i++) {
         for (int j = 0; j < WIDTH; j++) {
-            grid[i][j] = 0;
+            (*grid)[i][j] = 0;
         }
     }
 }
@@ -151,7 +161,7 @@ void warm(int* heater, int* hotplate)
 
 void nextframe(int** field, int** count, int* hotplate)
 {
-    cleargrid(count, heightrecord);
+    cleargrid(&count, heightrecord);
     int rowsum = 0;
     int h = heightrecord - 3;
     h = MAX(h, 1);  //we can ignore the vast majority of cold cells
@@ -246,8 +256,8 @@ void printframe(int** field, int** count)
 
 void flames()
 {
-    int** field = init(HEIGHT, WIDTH); //The cells that will be displayed
-    int** count = init(HEIGHT, WIDTH); //A grid of cells used to tally neighbors for CA purposes
+    int** field = new_grid(HEIGHT, WIDTH); //The cells that will be displayed
+    int** count = new_grid(HEIGHT, WIDTH); //A grid of cells used to tally neighbors for CA purposes
     // these special cells provide "heat" at the bottom of the screen.
     int* heater = malloc(WIDTH * sizeof(int));
     // The heater heats the hotplate. The hotplate will cool without heat.
@@ -259,12 +269,13 @@ void flames()
     }
 
     int c = 0;
-
+loop:
     while (sig_caught == 0 && (c = getch()) != 'q') {
-        //Use Rule 60 to make flames flicker nicely.
         if(c == KEY_UP) maxtemp++;
         if(c == KEY_DOWN && maxtemp > 1) maxtemp--;
         wolfram(heater, wolfrule);
+        // In about 1 in 30 frames, flip a random cell in the heater from 0 to 1 and vice versa
+        if (!(rand() % 30)) { heater[rand()%WIDTH] ^= 0x1; }
         warm(heater, hotplate);
         printframe(field, count);
         nextframe(field, count, hotplate);
@@ -275,23 +286,31 @@ void flames()
         #endif
     }
 
-    if (c == 'q') raise(SIGINT);
-
-    refresh();
-    free(hotplate); free(heater);
-    deallocate(field, HEIGHT); deallocate(count, HEIGHT);
-}
-
-void run(){
-    while(sig_caught != 1){
-        getmaxyx(stdscr, HEIGHT, WIDTH);
-        flames();
+    // Resizing logic
+    if (sig_caught == SIGWINCH){
+        heightrecord = 0;
         endwin();
-        clear();
         refresh();
-        if (sig_caught == 2) sig_caught = 0;
+        size_t old_h = HEIGHT; size_t old_w = WIDTH;
+        getmaxyx(stdscr, HEIGHT, WIDTH);
+        resizeterm(HEIGHT, WIDTH);
+        resize_array(&heater, old_w, WIDTH);
+        resize_array(&hotplate, old_w, WIDTH);
+        // We flip the screen upside-down so that the bottom (where the flames are) gets copied
+        // first.
+        flip_grid(&field, old_h, old_w); flip_grid(&count, old_h, old_w);
+        resize_grid(&field, old_h, old_w, HEIGHT, WIDTH);
+        resize_grid(&count, old_h, old_w, HEIGHT, WIDTH);
+        // Don't forget to flip things right-side up!
+        flip_grid(&field, HEIGHT, WIDTH); flip_grid(&count, HEIGHT, WIDTH);
+        sig_caught = 0;
+        goto loop;
     }
+
+    free(hotplate); free(heater);
+    free_grid(field, HEIGHT); free_grid(count, HEIGHT);
 }
+
 //----------------------------------------------[Help]----------------------------------------------
 
 void printhelp(const char progname[])
@@ -313,12 +332,7 @@ void printhelp(const char progname[])
 
 void sig_handler(int signum)
 {
-    if (signum == SIGINT) {
-        sig_caught = 1;
-    }
-    if (signum == SIGWINCH) {
-        sig_caught = 2;
-    }
+    sig_caught = signum;
 }
 
 //----------------------------------------------[Main]----------------------------------------------
@@ -334,6 +348,7 @@ int main(int argc, char** argv)
     framerate = persecond / 20;
     maxtemp = 10;
     dispch = '@';
+    //Use Rule 60 to make flames flicker nicely.
     wolfrule = 60;
 
     int c;
@@ -367,7 +382,7 @@ int main(int argc, char** argv)
     }
     color_val* colors = malloc(8 * sizeof(color_val));
     start_ncurses(colors);
-    run();
+    flames();
     if(COLORS < 256){
         restore_colors(colors);
     }

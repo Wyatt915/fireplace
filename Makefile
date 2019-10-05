@@ -4,8 +4,19 @@ LNFLAGS = -lncurses
 DESTDIR ?= $(HOME)/bin
 EXEC = fireplace
 
-all:
+
+all: $(EXEC)
+
+.PHONY: debug clean install uninstall
+
+debug: CFLAGS=-g
+debug: $(EXEC)
+
+$(EXEC): main.c
 	$(CC) main.c $(CFLAGS) $(LNFLAGS) -o $(EXEC)
+
+clean:
+	rm $(EXEC)
 
 install:
 	install -d $(DESTDIR)
@@ -13,3 +24,4 @@ install:
 
 uninstall:
 	rm $(DESTDIR)/$(EXEC)
+
