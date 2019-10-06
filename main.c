@@ -37,14 +37,14 @@
 
 static int PALETTE_SZ;      //Number of flame colors used
 static int WIDTH, HEIGHT;   // size of the terminal
-static int heightrecord;    // highest point the flames reached last frame
+static int heightrecord=0;  // highest point the flames reached last frame
 static volatile sig_atomic_t sig_caught = 0;
 
 //--------------------------------------------[Structs]---------------------------------------------
 
 typedef struct colorvalstruct{ short r,g,b; } color_val;
 
-//------------------------------[Memory Management and Initialization]------------------------------
+//---------------------------------------[Memory Management]----------------------------------------
 
 // Most of the interesting stuff is going on at the bottom of the screen. We will make sure all
 // those goodies get preserved on a window resize by flipping the screen upside down and then
@@ -62,15 +62,17 @@ void flip_grid(int*** grid, size_t rows, size_t cols){
     }
 }
 
-void resize_array(int** ary, size_t old, size_t new){
+void resize_array(uint8_t** ary, size_t old, size_t new){
     size_t n = MIN(old, new);
-    int* temp = calloc(new, sizeof(int));
+    uint8_t* temp = calloc(new, sizeof(uint8_t));
     for (size_t i = 0; i < n; i++){
         temp[i] = (*ary)[i];
     }
     free(*ary);
     *ary = temp;
 }
+
+//---------------------------------------[Ncurses functions]----------------------------------------
 
 void start_ncurses(color_val* colors)
 {
@@ -146,19 +148,19 @@ void cleargrid(int*** grid, int h)
     }
 }
 
-void warm(int* heater, int* hotplate, int maxtemp)
+void warm(uint8_t* heater, uint8_t* hotplate, int maxtemp)
 {
-    for (int i = 0; i < WIDTH; i++) {
+    for (size_t i = 0; i < WIDTH; i++) {
         hotplate[i] /= 2;
     }
-    for (int i = 0; i < WIDTH; i++) {
+    for (size_t i = 0; i < WIDTH; i++) {
         hotplate[i] += heater[i] * maxtemp;
     }
 }
 
 //---------------------------------------[Cellular Automata]----------------------------------------
 
-void nextframe(int** field, int** count, int* hotplate)
+void nextframe(int** field, int** count, uint8_t* hotplate)
 {
     cleargrid(&count, heightrecord);
     int rowsum = 0;
@@ -210,12 +212,12 @@ void nextframe(int** field, int** count, int* hotplate)
 
 //Wolfram's Elementary cellular atomaton
 //https://en.wikipedia.org/wiki/Elementary_cellular_automaton
-void wolfram(int* world, const int rule)
+void wolfram(uint8_t* world, const uint8_t rule)
 {
-    int* next = malloc(WIDTH * sizeof(int));
-    int l,c,r;
-    int lidx, ridx;
-    int current;
+    uint8_t* next = malloc(WIDTH * sizeof(uint8_t));
+    size_t l,c,r;
+    size_t lidx, ridx;
+    uint8_t current;
     for (int i = 0; i < WIDTH; i++) {
         lidx = i > 0 ? i - 1 : WIDTH - 1;
         ridx = (i + 1) % WIDTH;
@@ -236,17 +238,16 @@ void wolfram(int* world, const int rule)
 
 void printframe(int** field, char dispch, int maxtemp)
 {
-    char disp;
-    for (int i = 0; i < HEIGHT; i++) {
+    int color;
+    // On the first run, heightrecord is set to 0, so the whole frame gets drawn. On subsequent
+    // frames, only the lines that are below the heightrecord get drawn.
+    for (int i = heightrecord; i < HEIGHT; i++) {
         for (int j = 0; j < WIDTH; j++) {
-
             move(i,j);
-            //if the cell is cold, print a space, otherwise print [dispch]
-            int color = (PALETTE_SZ * field[i][j] / maxtemp) + 1;
-            color = MIN(color, PALETTE_SZ);
-            disp = field[i][j] == 0 ? ' ' : dispch;
+            color = MIN(PALETTE_SZ, (PALETTE_SZ * field[i][j] / maxtemp) + 1);
             attron(COLOR_PAIR(color));
-            addch(disp);
+            //if the cell is cold, print a space, otherwise print [dispch]
+            addch(field[i][j] == 0 ? ' ' : dispch);
             attroff(COLOR_PAIR(color));
         }
     }
@@ -255,16 +256,15 @@ void printframe(int** field, char dispch, int maxtemp)
 
 void flames(char dispch, uint8_t wolfrule, int maxtemp, int frameperiod)
 {
-    heightrecord = HEIGHT; //max height previously reached by the flames
     int** field = new_grid(HEIGHT, WIDTH); //The cells that will be displayed
     int** count = new_grid(HEIGHT, WIDTH); //A grid of cells used to tally neighbors for CA purposes
 
     // these special cells provide "heat" at the bottom of the screen.
     // The heater heats the hotplate. The hotplate will cool without heat.
-    int* heater = malloc(WIDTH * sizeof(int));
-    int* hotplate = malloc(WIDTH * sizeof(int));
+    uint8_t* heater = malloc(WIDTH * sizeof(uint8_t));
+    uint8_t* hotplate = malloc(WIDTH * sizeof(uint8_t));
 
-    for (int i = 0; i < WIDTH; i++) {
+    for (size_t i = 0; i < WIDTH; i++) {
         heater[i] = rand() % 2;
         hotplate[i] = 0;
     }
