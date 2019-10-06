@@ -35,13 +35,9 @@
 
 //----------------------------------------[Global variables]----------------------------------------
 
-static char dispch;        //the character used to draw the flames
-static int WIDTH, HEIGHT;  //Set by ncurses
-static int framerate;      //framerate
-static int heightrecord;   //max height reached by the flames
-static int maxtemp;        //maximum flame temperature
-static int wolfrule;       //rule for wolfram eca
-static int NUM_COLORS;     //Number of flame colors used
+static int PALETTE_SZ;      //Number of flame colors used
+static int WIDTH, HEIGHT;   // size of the terminal
+static int heightrecord;    // highest point the flames reached last frame
 static volatile sig_atomic_t sig_caught = 0;
 
 //--------------------------------------------[Structs]---------------------------------------------
@@ -84,7 +80,7 @@ void start_ncurses(color_val* colors)
         for (int i = 0; i < 8; i++) {
             color_content(i, &colors[i].r, &colors[i].g, &colors[i].b);
         }
-        NUM_COLORS = 7;
+        PALETTE_SZ = 7;
         init_color(COLOR_BLACK,    100,   100,   100);
         init_color(COLOR_RED,      300,   0,     0);
         init_color(COLOR_GREEN,    500,   0,     0);
@@ -103,13 +99,17 @@ void start_ncurses(color_val* colors)
         init_pair(7,  COLOR_WHITE,    COLOR_BLACK);
     }
     else {
-        int x256[] = { 233, 52, 88, 124, 160, 166, 202, 208, 214, 220, 226, 227, 228, 229, 230, 231 };
-        NUM_COLORS = sizeof(x256)/sizeof(int);
+        const int x256[] = {
+            233,  52,  88, 124,
+            160, 166, 202, 208,
+            214, 220, 226, 227,
+            228, 229, 230, 231};
+        PALETTE_SZ = sizeof(x256)/sizeof(int);
         // the first color in the list will be the background, so we start at 1.
-        for(size_t i = 1; i < NUM_COLORS; i++){
+        for(size_t i = 1; i < PALETTE_SZ; i++){
             init_pair(i, x256[i], x256[0]);
         }
-        NUM_COLORS -= 1;
+        PALETTE_SZ -= 1;
     }
     curs_set(0);    //invisible cursor
     timeout(0);     //make getch() non-blocking
@@ -118,7 +118,6 @@ void start_ncurses(color_val* colors)
     noecho();
     keypad(stdscr, TRUE);
     getmaxyx(stdscr, HEIGHT, WIDTH);
-    heightrecord = HEIGHT;
 }
 
 void restore_colors(color_val* colors)
@@ -147,7 +146,7 @@ void cleargrid(int*** grid, int h)
     }
 }
 
-void warm(int* heater, int* hotplate)
+void warm(int* heater, int* hotplate, int maxtemp)
 {
     for (int i = 0; i < WIDTH; i++) {
         hotplate[i] /= 2;
@@ -195,7 +194,7 @@ void nextframe(int** field, int** count, int* hotplate)
             avg /= counter;
             //see if the cell cools or not
             //we add the value at (i-1) so that an upward motion will be created.
-            count[i - 1][j] = cooldown(avg);
+            count[i-1][j] = cooldown(avg);
             rowsum += count[i-1][j];
         }
         if (rowsum > 0 && i < heightrecord) heightrecord = i;
@@ -235,7 +234,7 @@ void wolfram(int* world, const int rule)
 
 //----------------------------------------[Draw and Animate]----------------------------------------
 
-void printframe(int** field, int** count)
+void printframe(int** field, char dispch, int maxtemp)
 {
     char disp;
     for (int i = 0; i < HEIGHT; i++) {
@@ -243,8 +242,8 @@ void printframe(int** field, int** count)
 
             move(i,j);
             //if the cell is cold, print a space, otherwise print [dispch]
-            int color = (NUM_COLORS * field[i][j] / maxtemp) + 1;
-            color = MIN(color,NUM_COLORS);
+            int color = (PALETTE_SZ * field[i][j] / maxtemp) + 1;
+            color = MIN(color, PALETTE_SZ);
             disp = field[i][j] == 0 ? ' ' : dispch;
             attron(COLOR_PAIR(color));
             addch(disp);
@@ -254,13 +253,15 @@ void printframe(int** field, int** count)
     refresh();
 }
 
-void flames()
+void flames(char dispch, uint8_t wolfrule, int maxtemp, int frameperiod)
 {
+    heightrecord = HEIGHT; //max height previously reached by the flames
     int** field = new_grid(HEIGHT, WIDTH); //The cells that will be displayed
     int** count = new_grid(HEIGHT, WIDTH); //A grid of cells used to tally neighbors for CA purposes
+
     // these special cells provide "heat" at the bottom of the screen.
-    int* heater = malloc(WIDTH * sizeof(int));
     // The heater heats the hotplate. The hotplate will cool without heat.
+    int* heater = malloc(WIDTH * sizeof(int));
     int* hotplate = malloc(WIDTH * sizeof(int));
 
     for (int i = 0; i < WIDTH; i++) {
@@ -271,18 +272,18 @@ void flames()
     int c = 0;
 loop:
     while (sig_caught == 0 && (c = getch()) != 'q') {
-        if(c == KEY_UP) maxtemp++;
-        if(c == KEY_DOWN && maxtemp > 1) maxtemp--;
+        if(c == KEY_UP || c == 'k') maxtemp++;
+        if((c == KEY_DOWN || c == 'j') && maxtemp > 1) maxtemp--;
         wolfram(heater, wolfrule);
         // In about 1 in 30 frames, flip a random cell in the heater from 0 to 1 and vice versa
         if (!(rand() % 30)) { heater[rand()%WIDTH] ^= 0x1; }
-        warm(heater, hotplate);
-        printframe(field, count);
+        warm(heater, hotplate, maxtemp);
+        printframe(field, dispch, maxtemp);
         nextframe(field, count, hotplate);
         #ifdef _WIN32
-            Sleep(framerate);
+            Sleep(frameperiod);
         #elif __linux__
-            usleep(framerate);
+            usleep(frameperiod);
         #endif
     }
 
@@ -343,13 +344,14 @@ int main(int argc, char** argv)
     signal(SIGINT, sig_handler);
     signal(SIGWINCH, sig_handler);
 
-    int persecond = 1000000;
     srand(time(NULL));
-    framerate = persecond / 20;
-    maxtemp = 10;
-    dispch = '@';
+
+    const int persecond = 1000000;
+    int frameperiod = persecond / 20;
+    int maxtemp = 10;
+    int dispch = '@';
     //Use Rule 60 to make flames flicker nicely.
-    wolfrule = 60;
+    int wolfrule = 60;
 
     int c;
     opterr = 0;
@@ -362,8 +364,8 @@ int main(int argc, char** argv)
                 printhelp(argv[0]);
                 return 0;
             case 'f':
-                if (atoi(optarg) < 1) framerate = 0;
-                else framerate = persecond / atoi(optarg);
+                if (atoi(optarg) < 1) frameperiod = 0;
+                else frameperiod = persecond / atoi(optarg);
                 break;
             case 't':
                 maxtemp = atoi(optarg);
@@ -382,7 +384,7 @@ int main(int argc, char** argv)
     }
     color_val* colors = malloc(8 * sizeof(color_val));
     start_ncurses(colors);
-    flames();
+    flames(dispch, wolfrule, maxtemp, frameperiod);
     if(COLORS < 256){
         restore_colors(colors);
     }
