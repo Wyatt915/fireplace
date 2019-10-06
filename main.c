@@ -30,8 +30,9 @@
 #include <windows.h> //Sleep
 #endif
 
-#define cell_t int //the type of cell MUST be defined before including ncurses_ca_utils.
-#include "ncurses_ca_utils.h"
+//the type of cell MUST be defined before including ncurses_ca_utils.
+#define CELL_TYPE int
+#include "grid_utils.h"
 
 //----------------------------------------[Global variables]----------------------------------------
 
