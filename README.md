@@ -22,3 +22,10 @@ Usage: ./fireplace [options]
 
 Press q at any time to douse the flames.
 ```
+
+## Docker build and run
+* `docker build . -t fireplace:latest`
+* `docker run -it --rm fireplace`
+
+### Run with arguments:
+* `docker run -it --rm fireplace -t 7`
