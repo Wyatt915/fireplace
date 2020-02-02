@@ -9,7 +9,7 @@ all: $(EXEC)
 
 .PHONY: debug clean install uninstall
 
-debug: CFLAGS=-g
+debug: CFLAGS=-g -gdwarf-2 -g3
 debug: $(EXEC)
 
 $(EXEC): main.c

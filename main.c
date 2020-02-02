@@ -52,15 +52,15 @@ typedef struct colorvalstruct{ short r,g,b; } color_val;
 // Most of the interesting stuff is going on at the bottom of the screen. We will make sure all
 // those goodies get preserved on a window resize by flipping the screen upside down and then
 // copying like normal.
-void flip_grid(ca_grid* grid, size_t rows, size_t cols){
+void flip_grid(ca_grid** grid, size_t rows, size_t cols){
     CELL_TYPE* temp = malloc(cols * sizeof(int));
     for(size_t i = 0; i < rows/2; i++){
         for (size_t j = 0; j < cols; j++){
-            temp[j] = IDX(grid, rows-i-1, j);
-            IDX(grid, rows-i-1, j) = IDX(grid, i, j);
+            temp[j] = IDX((*grid), rows-i-1, j);
+            IDX((*grid), rows-i-1, j) = IDX((*grid), i, j);
         }
         for (size_t j = 0; j < cols; j++){
-            IDX(grid, i, j) = temp[j];
+            IDX((*grid), i, j) = temp[j];
         }
     }
 }
@@ -187,7 +187,7 @@ void nextframe(ca_grid* field, ca_grid* count, uint8_t* hotplate)
                     int y = i + yoff;
                     y = MAX(y,0); //if y is less than zero, clamp it to zero.
                     int x = j + xoff;
-                    //if the search has gon beyond the left or right, no heat is added
+                    //if the search has gone beyond the left or right, no heat is added
                     if (x < 0 || x >= WIDTH) avg += 0;
                     //if the search goes below the screen, add the hotplate value.
                     //the hotplate has infinite depth.
@@ -302,11 +302,11 @@ loop:
         resize_array(&hotplate, old_w, WIDTH);
         // We flip the screen upside-down so that the bottom (where the flames are) gets copied
         // first.
-        flip_grid(field, old_h, old_w); flip_grid(count, old_h, old_w);
+        flip_grid(&field, old_h, old_w); flip_grid(&count, old_h, old_w);
         resize_grid(&field, old_h, old_w, HEIGHT, WIDTH);
         resize_grid(&count, old_h, old_w, HEIGHT, WIDTH);
         // Don't forget to flip things right-side up!
-        flip_grid(field, HEIGHT, WIDTH); flip_grid(count, HEIGHT, WIDTH);
+        flip_grid(&field, HEIGHT, WIDTH); flip_grid(&count, HEIGHT, WIDTH);
         sig_caught = 0;
         goto loop;
     }

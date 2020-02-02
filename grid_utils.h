@@ -14,7 +14,7 @@
 #define CLAMP(X, A, B)  (MAX((A),MIN((X),(B))))
 
 //Gives the ability to treat a 1d array as a 2d array
-#define IDX(GRID, R, C) (GRID->data[(R) * GRID->rows + (C)])
+#define IDX(GRID, R, C) ((GRID->data)[(R) * (GRID->cols) + (C)])
 
 /**
  * Grid structure for celluluar automata
@@ -47,7 +47,6 @@ void free_grid(ca_grid* grid)
 {
     free(grid->data);
     free(grid);
-    grid = 0x0;
 }
 
 /**
