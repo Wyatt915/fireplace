@@ -30,9 +30,11 @@
 #include <windows.h> //Sleep
 #endif
 
-//the type of cell MUST be defined before including ncurses_ca_utils.
+//the type of cell MUST be defined before including grid_utils.
 #define CELL_TYPE int
 #include "grid_utils.h"
+
+
 
 //----------------------------------------[Global variables]----------------------------------------
 
@@ -50,15 +52,15 @@ typedef struct colorvalstruct{ short r,g,b; } color_val;
 // Most of the interesting stuff is going on at the bottom of the screen. We will make sure all
 // those goodies get preserved on a window resize by flipping the screen upside down and then
 // copying like normal.
-void flip_grid(int*** grid, size_t rows, size_t cols){
-    int* temp = malloc(cols * sizeof(int));
+void flip_grid(ca_grid* grid, size_t rows, size_t cols){
+    CELL_TYPE* temp = malloc(cols * sizeof(int));
     for(size_t i = 0; i < rows/2; i++){
         for (size_t j = 0; j < cols; j++){
-            temp[j] = (*grid)[rows-i-1][j];
-            (*grid)[rows-i-1][j] = (*grid)[i][j];
+            temp[j] = IDX(grid, rows-i-1, j);
+            IDX(grid, rows-i-1, j) = IDX(grid, i, j);
         }
         for (size_t j = 0; j < cols; j++){
-            (*grid)[i][j] = temp[j];
+            IDX(grid, i, j) = temp[j];
         }
     }
 }
@@ -140,11 +142,11 @@ int cooldown(int heat) {
     return heat;
 }
 
-void cleargrid(int*** grid, int h)
+void cleargrid(ca_grid* grid, int h)
 {
     for (int i = h; i < HEIGHT; i++) {
         for (int j = 0; j < WIDTH; j++) {
-            (*grid)[i][j] = 0;
+            IDX(grid, i, j) = 0;
         }
     }
 }
@@ -161,9 +163,9 @@ void warm(uint8_t* heater, uint8_t* hotplate, int maxtemp)
 
 //---------------------------------------[Cellular Automata]----------------------------------------
 
-void nextframe(int** field, int** count, uint8_t* hotplate)
+void nextframe(ca_grid* field, ca_grid* count, uint8_t* hotplate)
 {
-    cleargrid(&count, heightrecord);
+    cleargrid(count, heightrecord);
     int rowsum = 0;
     int h = heightrecord - 3;
     h = MAX(h, 1);  //we can ignore the vast majority of cold cells
@@ -190,15 +192,15 @@ void nextframe(int** field, int** count, uint8_t* hotplate)
                     //if the search goes below the screen, add the hotplate value.
                     //the hotplate has infinite depth.
                     else if (y >= HEIGHT)  avg += hotplate[x];
-                    else avg += field[y][x];
+                    else avg += IDX(field, y, x);
                     counter++;
                 }
             }
             avg /= counter;
             //see if the cell cools or not
             //we add the value at (i-1) so that an upward motion will be created.
-            count[i-1][j] = cooldown(avg);
-            rowsum += count[i-1][j];
+            IDX(count, i-1, j) = cooldown(avg);
+            rowsum += IDX(count, i-1, j);
         }
         if (rowsum > 0 && i < heightrecord) heightrecord = i;
         rowsum = 0;
@@ -206,7 +208,7 @@ void nextframe(int** field, int** count, uint8_t* hotplate)
 
     for (int i = 0; i < HEIGHT; i++) {
         for (int j = 0; j < WIDTH; j++) {
-            field[i][j] = count[i][j];
+            IDX(field, i, j) = IDX(count, i, j);
         }
     }
 }
@@ -237,7 +239,7 @@ void wolfram(uint8_t* world, const uint8_t rule)
 
 //----------------------------------------[Draw and Animate]----------------------------------------
 
-void printframe(int** field, char dispch, int maxtemp)
+void printframe(ca_grid* field, char dispch, int maxtemp)
 {
     int color;
     // On the first run, heightrecord is set to 0, so the whole frame gets drawn. On subsequent
@@ -245,10 +247,10 @@ void printframe(int** field, char dispch, int maxtemp)
     for (int i = heightrecord; i < HEIGHT; i++) {
         for (int j = 0; j < WIDTH; j++) {
             move(i,j);
-            color = MIN(PALETTE_SZ, (PALETTE_SZ * field[i][j] / maxtemp) + 1);
+            color = MIN(PALETTE_SZ, (PALETTE_SZ * IDX(field, i, j) / maxtemp) + 1);
             attron(COLOR_PAIR(color));
             //if the cell is cold, print a space, otherwise print [dispch]
-            addch(field[i][j] == 0 ? ' ' : dispch);
+            addch(IDX(field, i, j) == 0 ? ' ' : dispch);
             attroff(COLOR_PAIR(color));
         }
     }
@@ -257,8 +259,8 @@ void printframe(int** field, char dispch, int maxtemp)
 
 void flames(char dispch, uint8_t wolfrule, int maxtemp, int frameperiod)
 {
-    int** field = new_grid(HEIGHT, WIDTH); //The cells that will be displayed
-    int** count = new_grid(HEIGHT, WIDTH); //A grid of cells used to tally neighbors for CA purposes
+    ca_grid* field = new_grid(HEIGHT, WIDTH); //The cells that will be displayed
+    ca_grid* count = new_grid(HEIGHT, WIDTH); //A grid of cells used to tally neighbors for CA purposes
 
     // these special cells provide "heat" at the bottom of the screen.
     // The heater heats the hotplate. The hotplate will cool without heat.
@@ -300,17 +302,17 @@ loop:
         resize_array(&hotplate, old_w, WIDTH);
         // We flip the screen upside-down so that the bottom (where the flames are) gets copied
         // first.
-        flip_grid(&field, old_h, old_w); flip_grid(&count, old_h, old_w);
+        flip_grid(field, old_h, old_w); flip_grid(count, old_h, old_w);
         resize_grid(&field, old_h, old_w, HEIGHT, WIDTH);
         resize_grid(&count, old_h, old_w, HEIGHT, WIDTH);
         // Don't forget to flip things right-side up!
-        flip_grid(&field, HEIGHT, WIDTH); flip_grid(&count, HEIGHT, WIDTH);
+        flip_grid(field, HEIGHT, WIDTH); flip_grid(count, HEIGHT, WIDTH);
         sig_caught = 0;
         goto loop;
     }
 
     free(hotplate); free(heater);
-    free_grid(field, HEIGHT); free_grid(count, HEIGHT);
+    free_grid(field); free_grid(count);
 }
 
 //----------------------------------------------[Help]----------------------------------------------

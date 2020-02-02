@@ -9,19 +9,33 @@
 
 #define MIN(X, Y)       ((X) < (Y) ? (X) : (Y))
 #define MAX(X, Y)       ((X) > (Y) ? (X) : (Y))
+
+//Clamp the variable X between the bounds A and B.
 #define CLAMP(X, A, B)  (MAX((A),MIN((X),(B))))
+
+//Gives the ability to treat a 1d array as a 2d array
+#define IDX(GRID, R, C) (GRID->data[(R) * GRID->rows + (C)])
+
+/**
+ * Grid structure for celluluar automata
+ */
+typedef struct ca_grid{
+    CELL_TYPE* data;
+    int rows, cols;
+} ca_grid;
+
+
 
 /**
  * Initializes a new grid of cells to be printed in the terminal
  * @param rows the number of rows in the terminal
  * @param cols the number of columns in the terminal
  */
-CELL_TYPE** new_grid(size_t rows, size_t cols) {
-    CELL_TYPE** out = malloc(rows * sizeof(CELL_TYPE*));
-    for (size_t i = 0; i < rows; i++) {
-        //initialize the grid to be all zeroes
-        out[i] = calloc(cols, sizeof(CELL_TYPE));
-    }
+ca_grid* new_grid(size_t rows, size_t cols) {
+    ca_grid* out = malloc(sizeof(ca_grid));
+    out->data = calloc(rows * cols, sizeof(CELL_TYPE));
+    out->rows = rows;
+    out->cols = cols;
     return out;
 }
 
@@ -29,12 +43,11 @@ CELL_TYPE** new_grid(size_t rows, size_t cols) {
  * Frees a grid previously created by the function new_grid
  * @param rows number of rows in the grid
  */
-void free_grid(CELL_TYPE** in, size_t rows)
+void free_grid(ca_grid* grid)
 {
-    for (size_t i = 0; i < rows; i++) {
-        free(in[i]);
-    }
-    free(in);
+    free(grid->data);
+    free(grid);
+    grid = 0x0;
 }
 
 /**
@@ -44,10 +57,10 @@ void free_grid(CELL_TYPE** in, size_t rows)
  * @param rows the number of rows to be copied
  * @param cols the number of columns to be copied
  */
-void copy_grid(CELL_TYPE*** dest, CELL_TYPE*** src, size_t rows, size_t cols){
+void copy_grid(ca_grid* dest, ca_grid* src, const size_t rows, const size_t cols){
      for(size_t i = 0; i < rows; i++){
          for (size_t j = 0; j < cols; j++){
-             (*dest)[i][j] = (*src)[i][j];
+             IDX(dest, i, j) = IDX(src, i, j);
          }
      }
  }
@@ -64,14 +77,14 @@ void copy_grid(CELL_TYPE*** dest, CELL_TYPE*** src, size_t rows, size_t cols){
  * @param new_c the number of columns in the resized grid
  * @param copyfunc a function pointer to a user-defined function to perform the array copying
  */
-void resize_grid_cust(CELL_TYPE*** grid, size_t old_r, size_t old_c, size_t new_r, size_t new_c,
-    void (*copyfunc)(CELL_TYPE***, CELL_TYPE***, const size_t, const size_t) )
+void resize_grid_cust(ca_grid** grid, size_t old_r, size_t old_c, size_t new_r, size_t new_c,
+    void (*copyfunc)(ca_grid*, ca_grid*, const size_t, const size_t) )
 {
-    CELL_TYPE** resized = new_grid(new_r, new_c);
+    ca_grid* resized = new_grid(new_r, new_c);
     size_t row_copylimit = MIN(old_r, new_r);
     size_t col_copylimit = MIN(old_c, new_c);
-    copyfunc(&resized, grid, row_copylimit, col_copylimit);
-    free_grid(*grid, old_r);
+    copyfunc(resized, *grid, row_copylimit, col_copylimit);
+    free_grid(*grid);
     *grid = resized;
 }
 
@@ -83,7 +96,7 @@ void resize_grid_cust(CELL_TYPE*** grid, size_t old_r, size_t old_c, size_t new_
  * @param new_r the number of rows in the resized grid
  * @param new_c the number of columns in the resized grid
  */
-void resize_grid(CELL_TYPE*** grid, size_t old_r, size_t old_c, size_t new_r, size_t new_c){
+void resize_grid(ca_grid** grid, size_t old_r, size_t old_c, size_t new_r, size_t new_c){
     resize_grid_cust(grid, old_r, old_c, new_r, new_c, &copy_grid);
 }
 
