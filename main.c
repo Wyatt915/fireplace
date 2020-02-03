@@ -21,10 +21,15 @@
 ***************************************************************************************************/
 
 #include <time.h>
-#include <ncurses.h>
 #include <signal.h>
 #include <stdlib.h> //random
 #include <unistd.h> //usleep, getopt
+
+#ifdef NOTCURSES
+#include <notcurses.h>
+#else
+#include <ncurses.h>
+#endif
 
 #ifdef _WIN32
 #include <windows.h> //Sleep
@@ -104,6 +109,7 @@ void start_ncurses(color_val* colors)
         init_pair(7,  COLOR_WHITE,    COLOR_BLACK);
     }
     else {
+        // A decent gradient from the X11 256 color palette
         const int x256[] = {
             233,  52,  88, 124,
             160, 166, 202, 208,
@@ -302,7 +308,7 @@ loop:
         resize_array(&hotplate, old_w, WIDTH);
         // We flip the screen upside-down so that the bottom (where the flames are) gets copied
         // first.
-        flip_grid(&field, old_h, old_w); flip_grid(&count, old_h, old_w);
+        flip_grid(&field, old_h, old_w); //flip_grid(&count, old_h, old_w);
         resize_grid(&field, old_h, old_w, HEIGHT, WIDTH);
         resize_grid(&count, old_h, old_w, HEIGHT, WIDTH);
         // Don't forget to flip things right-side up!

@@ -12,6 +12,10 @@ all: $(EXEC)
 debug: CFLAGS=-g -gdwarf-2 -g3
 debug: $(EXEC)
 
+notcurses: LNFLAGS=-L/usr/local/lib -lnotcurses -DNOTCURSES
+notcurses: CFLAGS+= -I/usr/local/include
+notcurses: $(EXEC)
+
 $(EXEC): main.c
 	$(CC) main.c $(CFLAGS) $(LNFLAGS) -o $(EXEC)
 
