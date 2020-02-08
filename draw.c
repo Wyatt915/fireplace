@@ -8,46 +8,80 @@
 extern int HEIGHT, WIDTH;
 
 #ifdef NOTCURSES
+
 #include <notcurses.h>
 #include <locale.h>
+
 static notcurses_options ncopt;
 static struct notcurses* nc;
 static struct ncplane* stdplane;
+int colors[7][3] ={
+    {.3*256,  0,        0},
+    {.5*256,  0,        0},
+    {.7*256,  .1*256,   0},
+    {.9*256,  .3*256,   0},
+    {255,     .5*256,   .1*256},
+    {255,     .8*256,   .5*256},
+    {255,     255,      255}
+};
 
 void printframe(ca_grid* field, char dispch, int maxtemp, int heightrecord)
 {
+    int PALETTE_SZ = 7;
+    char c;
+    cell* current;
     int color;
     // On the first run, heightrecord is set to 0, so the whole frame gets drawn. On subsequent
     // frames, only the lines that are below the heightrecord get drawn.
     for (int i = heightrecord; i < HEIGHT; i++) {
         for (int j = 0; j < WIDTH; j++) {
-            move(i,j);
             color = MIN(PALETTE_SZ, (PALETTE_SZ * IDX(field, i, j) / maxtemp) + 1);
-            attron(COLOR_PAIR(color));
-            //if the cell is cold, print a space, otherwise print [dispch]
-            addch(IDX(field, i, j) == 0 ? ' ' : dispch);
-            attroff(COLOR_PAIR(color));
+            c = IDX(field, i, j) == 0 ? ' ' : dispch;
+            ncplane_at_yx(stdplane, i, j, current);
+            cell_init(current);
+            cell_load(stdplane, current, &c);
+            cell_set_fg_rgb(current, colors[color][0], colors[color][1], colors[color][2]);
+            cell_release(stdplane, current);
         }
     }
-    refresh();
+    notcurses_render(nc);
 }
 
 void clearscreen()
 {
+    ncplane_erase(stdplane);
+}
+
+int getchar(){
+    return notcurses_getc_nblock(nc, NULL);
+}
+
+void get_screen_sz(int* h, int* w)
+{
+    ncplane_dim_yx(stdplane, h, w);
+}
+
+void resize(int h, int w)
+{
+
 }
 
 void begin_draw()
 {
     setlocale(LC_ALL, "");
     memset(&ncopt, 0, sizeof(ncopt));
-
+    nc = notcurses_init(&ncopt, stdout);
+    stdplane = notcurses_stdplane(nc);
 }
 
 void end_draw()
 {
+    notcurses_stop(nc);
 }
+
 #else
 #include <ncurses.h>
+
 //---------------------------------------[Ncurses functions]----------------------------------------
 
 

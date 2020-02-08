@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS =-c -O2
+CFLAGS =-c
 LNFLAGS = -lncurses
 DESTDIR ?= $(HOME)/bin
 EXEC = fireplace
@@ -11,12 +11,15 @@ all: $(EXEC)
 
 .PHONY: debug clean install uninstall
 
-notcurses: LNFLAGS=-L/usr/local/lib -lnotcurses -DNOTCURSES
-notcurses: CFLAGS+= -I/usr/local/include
+.PHONY: notcurses
+notcurses: LNFLAGS=-L/usr/local/lib -lnotcurses 
+notcurses: CFLAGS+= -I/usr/local/include -DNOTCURSES
 notcurses: $(EXEC)
+	echo "wowee"
 
-debug: CFLAGS=-g -gdwarf-2 -g3
+debug: CFLAGS=-c -g -gdwarf-2 -g3
 debug: $(EXEC)
+	echo "oops"
 
 $(EXEC): $(OBJECTS)
 	$(CC) $(OBJECTS) $(LNFLAGS) -o $(EXEC)
