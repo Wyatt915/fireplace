@@ -24,12 +24,8 @@
 #include <signal.h>
 #include <stdlib.h> //random
 #include <unistd.h> //usleep, getopt
-
-#ifdef NOTCURSES
-#include <notcurses.h>
-#else
-#include <ncurses.h>
-#endif
+#include <stdint.h>
+#include <stdio.h>
 
 #ifdef _WIN32
 #include <windows.h> //Sleep
@@ -38,19 +34,17 @@
 //the type of cell MUST be defined before including grid_utils.
 #define CELL_TYPE int
 #include "grid_utils.h"
-
+#include "draw.h"
 
 
 //----------------------------------------[Global variables]----------------------------------------
 
-static int PALETTE_SZ;      //Number of flame colors used
-static int WIDTH, HEIGHT;   // size of the terminal
+int WIDTH, HEIGHT;   // size of the terminal
 static int heightrecord=0;  // highest point the flames reached last frame
 static volatile sig_atomic_t sig_caught = 0;
 
 //--------------------------------------------[Structs]---------------------------------------------
 
-typedef struct colorvalstruct{ short r,g,b; } color_val;
 
 //---------------------------------------[Memory Management]----------------------------------------
 
@@ -80,63 +74,6 @@ void resize_array(uint8_t** ary, size_t old, size_t new){
     *ary = temp;
 }
 
-//---------------------------------------[Ncurses functions]----------------------------------------
-
-void start_ncurses(color_val* colors)
-{
-    initscr();
-    start_color();
-    if (COLORS < 256){
-        for (int i = 0; i < 8; i++) {
-            color_content(i, &colors[i].r, &colors[i].g, &colors[i].b);
-        }
-        PALETTE_SZ = 7;
-        init_color(COLOR_BLACK,    100,   100,   100);
-        init_color(COLOR_RED,      300,   0,     0);
-        init_color(COLOR_GREEN,    500,   0,     0);
-        init_color(COLOR_BLUE,     700,   100,   0);
-        init_color(COLOR_YELLOW,   900,   300,   0);
-        init_color(COLOR_MAGENTA,  1000,  500,   100);
-        init_color(COLOR_CYAN,     1000,  800,   500);
-        init_color(COLOR_WHITE,    1000,  1000,  1000);
-
-        init_pair(1,  COLOR_RED,      COLOR_BLACK);
-        init_pair(2,  COLOR_GREEN,    COLOR_BLACK);
-        init_pair(3,  COLOR_BLUE,     COLOR_BLACK);
-        init_pair(4,  COLOR_YELLOW,   COLOR_BLACK);
-        init_pair(5,  COLOR_MAGENTA,  COLOR_BLACK);
-        init_pair(6,  COLOR_CYAN,     COLOR_BLACK);
-        init_pair(7,  COLOR_WHITE,    COLOR_BLACK);
-    }
-    else {
-        // A decent gradient from the X11 256 color palette
-        const int x256[] = {
-            233,  52,  88, 124,
-            160, 166, 202, 208,
-            214, 220, 226, 227,
-            228, 229, 230, 231};
-        PALETTE_SZ = sizeof(x256)/sizeof(int);
-        // the first color in the list will be the background, so we start at 1.
-        for(size_t i = 1; i < PALETTE_SZ; i++){
-            init_pair(i, x256[i], x256[0]);
-        }
-        PALETTE_SZ -= 1;
-    }
-    curs_set(0);    //invisible cursor
-    timeout(0);     //make getch() non-blocking
-
-    cbreak();
-    noecho();
-    keypad(stdscr, TRUE);
-    getmaxyx(stdscr, HEIGHT, WIDTH);
-}
-
-void restore_colors(color_val* colors)
-{
-    for (int i = 0; i < 8; i++) {
-        init_color(i, colors[i].r, colors[i].g, colors[i].b);
-    }
-}
 
 //-----------------------------------[Cellular Automata Helpers]------------------------------------
 
@@ -245,24 +182,6 @@ void wolfram(uint8_t* world, const uint8_t rule)
 
 //----------------------------------------[Draw and Animate]----------------------------------------
 
-void printframe(ca_grid* field, char dispch, int maxtemp)
-{
-    int color;
-    // On the first run, heightrecord is set to 0, so the whole frame gets drawn. On subsequent
-    // frames, only the lines that are below the heightrecord get drawn.
-    for (int i = heightrecord; i < HEIGHT; i++) {
-        for (int j = 0; j < WIDTH; j++) {
-            move(i,j);
-            color = MIN(PALETTE_SZ, (PALETTE_SZ * IDX(field, i, j) / maxtemp) + 1);
-            attron(COLOR_PAIR(color));
-            //if the cell is cold, print a space, otherwise print [dispch]
-            addch(IDX(field, i, j) == 0 ? ' ' : dispch);
-            attroff(COLOR_PAIR(color));
-        }
-    }
-    refresh();
-}
-
 void flames(char dispch, uint8_t wolfrule, int maxtemp, int frameperiod)
 {
     ca_grid* field = new_grid(HEIGHT, WIDTH); //The cells that will be displayed
@@ -279,15 +198,15 @@ void flames(char dispch, uint8_t wolfrule, int maxtemp, int frameperiod)
     }
 
     int c = 0;
-loop:
-    while (sig_caught == 0 && (c = getch()) != 'q') {
-        if(c == KEY_UP || c == 'k') maxtemp++;
-        if((c == KEY_DOWN || c == 'j') && maxtemp > 1) maxtemp--;
+draw:
+    while (sig_caught == 0 && (c = getchar()) != 'q') {
+        if(c == 'k') maxtemp++;
+        if(c == 'j' && maxtemp > 1) maxtemp--;
         wolfram(heater, wolfrule);
         // In about 1 in 30 frames, flip a random cell in the heater from 0 to 1 and vice versa
         if (!(rand() % 30)) { heater[rand()%WIDTH] ^= 0x1; }
         warm(heater, hotplate, maxtemp);
-        printframe(field, dispch, maxtemp);
+        printframe(field, dispch, maxtemp, heightrecord);
         nextframe(field, count, hotplate);
         #ifdef _WIN32
             Sleep(frameperiod);
@@ -299,11 +218,10 @@ loop:
     // Resizing logic
     if (sig_caught == SIGWINCH){
         heightrecord = 0;
-        endwin();
-        refresh();
+        clearscreen();
         size_t old_h = HEIGHT; size_t old_w = WIDTH;
-        getmaxyx(stdscr, HEIGHT, WIDTH);
-        resizeterm(HEIGHT, WIDTH);
+        get_screen_sz(&HEIGHT, &WIDTH);
+        resize(HEIGHT, WIDTH);
         resize_array(&heater, old_w, WIDTH);
         resize_array(&hotplate, old_w, WIDTH);
         // We flip the screen upside-down so that the bottom (where the flames are) gets copied
@@ -314,7 +232,7 @@ loop:
         // Don't forget to flip things right-side up!
         flip_grid(&field, HEIGHT, WIDTH); flip_grid(&count, HEIGHT, WIDTH);
         sig_caught = 0;
-        goto loop;
+        goto draw;
     }
 
     free(hotplate); free(heater);
@@ -391,15 +309,8 @@ int main(int argc, char** argv)
                 return 2;
         }
     }
-    color_val* colors = malloc(8 * sizeof(color_val));
-    start_ncurses(colors);
+    begin_draw();
     flames(dispch, wolfrule, maxtemp, frameperiod);
-    if(COLORS < 256){
-        restore_colors(colors);
-    }
-    free(colors);
-    clear();
-    refresh();
-    endwin();
+    end_draw();
     return 0;
 }
