@@ -29,7 +29,7 @@ void printframe(ca_grid* field, char dispch, int maxtemp, int heightrecord)
 {
     int PALETTE_SZ = 7;
     char c;
-    cell* current;
+    cell current;
     int color;
     // On the first run, heightrecord is set to 0, so the whole frame gets drawn. On subsequent
     // frames, only the lines that are below the heightrecord get drawn.
@@ -37,11 +37,12 @@ void printframe(ca_grid* field, char dispch, int maxtemp, int heightrecord)
         for (int j = 0; j < WIDTH; j++) {
             color = MIN(PALETTE_SZ, (PALETTE_SZ * IDX(field, i, j) / maxtemp) + 1);
             c = IDX(field, i, j) == 0 ? ' ' : dispch;
-            ncplane_at_yx(stdplane, i, j, current);
-            cell_init(current);
-            cell_load(stdplane, current, &c);
-            cell_set_fg_rgb(current, colors[color][0], colors[color][1], colors[color][2]);
-            cell_release(stdplane, current);
+            cell_init(&current);
+            ncplane_at_yx(stdplane, i, j, &current);
+            cell_load(stdplane, &current, &c);
+            cell_set_fg_rgb(&current, colors[color][0], colors[color][1], colors[color][2]);
+            ncplane_putc_yx(stdplane, i, j, &current);
+            cell_release(stdplane, &current);
         }
     }
     notcurses_render(nc);
@@ -72,6 +73,7 @@ void begin_draw()
     memset(&ncopt, 0, sizeof(ncopt));
     nc = notcurses_init(&ncopt, stdout);
     stdplane = notcurses_stdplane(nc);
+    ncplane_dim_yx(stdplane, &HEIGHT, &WIDTH);
 }
 
 void end_draw()

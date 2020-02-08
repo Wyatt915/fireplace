@@ -13,7 +13,7 @@ all: $(EXEC)
 
 .PHONY: notcurses
 notcurses: LNFLAGS=-L/usr/local/lib -lnotcurses 
-notcurses: CFLAGS+= -I/usr/local/include -DNOTCURSES
+notcurses: CFLAGS+= -g -I/usr/local/include -DNOTCURSES
 notcurses: $(EXEC)
 	echo "wowee"
 
