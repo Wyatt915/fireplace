@@ -27,7 +27,7 @@ int colors[7][3] ={
 
 void printframe(ca_grid* field, char dispch, int maxtemp, int heightrecord)
 {
-    int PALETTE_SZ = 7;
+    int PALETTE_SZ = 6;
     char c;
     cell current;
     int color;
@@ -64,13 +64,15 @@ void get_screen_sz(int* h, int* w)
 
 void resize(int h, int w)
 {
-
+    notcurses_resize(nc, &HEIGHT, &WIDTH);
+    ncplane_dim_yx(stdplane, &HEIGHT, &WIDTH);
 }
 
 void begin_draw()
 {
     setlocale(LC_ALL, "");
     memset(&ncopt, 0, sizeof(ncopt));
+    ncopt.no_winch_sighandler = true;
     nc = notcurses_init(&ncopt, stdout);
     stdplane = notcurses_stdplane(nc);
     ncplane_dim_yx(stdplane, &HEIGHT, &WIDTH);

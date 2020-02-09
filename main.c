@@ -43,9 +43,6 @@ int WIDTH, HEIGHT;   // size of the terminal
 static int heightrecord=0;  // highest point the flames reached last frame
 static volatile sig_atomic_t sig_caught = 0;
 
-//--------------------------------------------[Structs]---------------------------------------------
-
-
 //---------------------------------------[Memory Management]----------------------------------------
 
 // Most of the interesting stuff is going on at the bottom of the screen. We will make sure all
@@ -80,7 +77,7 @@ void resize_array(uint8_t** ary, size_t old, size_t new){
 //As a cell cools it has a higher chance of cooling again on the next frame.
 int cooldown(int heat) {
     if (heat == 0) return 0;
-    int r = (rand() % heat);
+    int r = (rand() % (heat*heat*heat));
     if (r == 0) heat--;
     return heat;
 }
