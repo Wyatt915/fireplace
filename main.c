@@ -239,25 +239,32 @@ void wolfram(uint8_t* world, const uint8_t rule)
 
 //----------------------------------------[Draw and Animate]----------------------------------------
 
-void printframe(ca_grid* field, char dispch, int maxtemp)
+
+void printframe(ca_grid* field, char dispch, int maxtemp, int random_mode)
 {
     int color;
-    // On the first run, heightrecord is set to 0, so the whole frame gets drawn. On subsequent
-    // frames, only the lines that are below the heightrecord get drawn.
+    char charList[] = {'@', '#', '%', '&', '*', '+', '=', '-', '~', '^'}; // Custom char list
+    int charListSize = sizeof(charList) / sizeof(charList[0]);  // Size of the list
+
     for (int i = heightrecord; i < HEIGHT; i++) {
         for (int j = 0; j < WIDTH; j++) {
-            move(i,j);
+            move(i, j);
             color = MIN(PALETTE_SZ, (PALETTE_SZ * IDX(field, i, j) / maxtemp) + 1);
             attron(COLOR_PAIR(color));
-            //if the cell is cold, print a space, otherwise print [dispch]
-            addch(IDX(field, i, j) == 0 ? ' ' : dispch);
+            
+            // Generate a random char for every cell, ensuring variety
+            char charToPrint = random_mode ? charList[rand() % charListSize] : dispch;
+
+            // Print space if cell is cold, otherwise print the character
+            addch(IDX(field, i, j) == 0 ? ' ' : charToPrint);
             attroff(COLOR_PAIR(color));
         }
     }
     refresh();
 }
 
-void flames(char dispch, uint8_t wolfrule, int maxtemp, int frameperiod)
+
+void flames(char dispch, uint8_t wolfrule, int maxtemp, int frameperiod, int random_mode)
 {
     ca_grid* field = new_grid(HEIGHT, WIDTH); //The cells that will be displayed
     ca_grid* count = new_grid(HEIGHT, WIDTH); //A grid of cells used to tally neighbors for CA purposes
@@ -281,7 +288,7 @@ loop:
         // In about 1 in 30 frames, flip a random cell in the heater from 0 to 1 and vice versa
         if (!(rand() % 30)) { heater[rand()%WIDTH] ^= 0x1; }
         warm(heater, hotplate, maxtemp);
-        printframe(field, dispch, maxtemp);
+        printframe(field, dispch, maxtemp, random_mode);
         nextframe(field, count, hotplate);
         #ifdef _WIN32
             Sleep(frameperiod);
@@ -327,7 +334,8 @@ void printhelp(const char progname[])
         "\t\t\tA framerate of zero will make frames spit out as soon as they are ready.\n"\
         "\t-t temp\t\tSet the maximum temperature of the flames. Default is 10.\n"\
         "\t\t\tA higher temp means taller flames. Press the up/down arrows\n"\
-        "\t\t\tto change the temperature at any time.\n\n"\
+        "\t\t\tto change the temperature at any time.\n"\
+        "\t-r\t\tprint random characters\n\n"
         "Press ^C or q at any time to douse the flames.\n\n";
     fprintf(stderr, fmtstr, progname);
 }
@@ -355,10 +363,10 @@ int main(int argc, char** argv)
     int dispch = '@';
     //Use Rule 60 to make flames flicker nicely.
     int wolfrule = 60;
-
+    int random_mode = 0;
     int c;
     opterr = 0;
-    while ((c = getopt(argc, argv, "c:hf:t:w:")) != -1) {
+    while ((c = getopt(argc, argv, "c:rhf:t:w:")) != -1) {
         switch (c) {
             case 'c':
                 dispch = optarg[0];
@@ -376,6 +384,9 @@ int main(int argc, char** argv)
             case 'w':
                 wolfrule = atoi(optarg);
                 break;
+	    case 'r':
+		random_mode = 1;
+		break;
             case '?':
                 fprintf(stderr, "\nYou've really bunged this one up. Here, this may help:\n");
                 printhelp(argv[0]);
@@ -387,7 +398,7 @@ int main(int argc, char** argv)
     }
     color_val* colors = malloc(8 * sizeof(color_val));
     start_ncurses(colors);
-    flames(dispch, wolfrule, maxtemp, frameperiod);
+    flames(dispch, wolfrule, maxtemp, frameperiod, random_mode);
     if(COLORS < 256){
         restore_colors(colors);
     }
