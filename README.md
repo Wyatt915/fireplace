@@ -30,4 +30,4 @@ Press ^C or q at any time to douse the flames.^C
 * `docker run -it --rm fireplace`
 
 ### Run with arguments:
-* `docker run -it --rm fireplace -t `
+* `docker run -it --rm fireplace -t 7`
