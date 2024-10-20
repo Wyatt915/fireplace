@@ -13,14 +13,16 @@ A cozy fireplace in your terminal
 ### Options
 ```
 Usage: ./fireplace [options]
-	-c character	An ASCII character to draw the flames. Default is '@'.
-	-h		Print this message.
-	-f framerate	Set the framerate in frames/sec. Default is 20.
-			A framerate of zero will make frames spit out as soon as they are ready.
-	-t temp		Set the maximum temperature of the flames. Default is 10.
-			A higher temp means taller flames.
+        -c character    An ASCII character to draw the flames. Default is '@'.
+        -h              Print this message.
+        -f framerate    Set the framerate in frames/sec. Default is 20.
+                        A framerate of zero will make frames spit out as soon as they are ready.
+        -t temp         Set the maximum temperature of the flames. Default is 10.
+                        A higher temp means taller flames. Press the up/down arrows
+                        to change the temperature at any time.
+        -r              print random characters
 
-Press q at any time to douse the flames.
+Press ^C or q at any time to douse the flames.^C
 ```
 
 ## Docker build and run
