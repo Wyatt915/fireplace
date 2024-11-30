@@ -292,7 +292,7 @@ loop:
         nextframe(field, count, hotplate);
         #ifdef _WIN32
             Sleep(frameperiod);
-        #elif __linux__
+        #elif __linux__ || __APPLE__
             usleep(frameperiod);
         #endif
     }
